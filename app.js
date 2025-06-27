@@ -162,6 +162,7 @@ app.get('/', (req, res) => {
             background: #f8f9ff;
             transition: all 0.3s ease;
             cursor: pointer;
+            position: relative;
         }
 
         .upload-area:hover {
@@ -188,7 +189,10 @@ app.get('/', (req, res) => {
         }
 
         .file-input {
-            display: none;
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+            pointer-events: none;
         }
 
         .upload-btn {
@@ -410,7 +414,7 @@ app.get('/', (req, res) => {
                     Arraste seus arquivos aqui ou clique para selecionar
                 </div>
                 <input type="file" id="fileInput" class="file-input" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip,.rar,.mp3,.mp4,.avi">
-                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                <button type="button" class="upload-btn" id="uploadBtn">
                     Escolher Arquivos
                 </button>
             </div>
@@ -438,13 +442,22 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
+        // Elementos DOM
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
         const progressBar = document.getElementById('progressBar');
         const progressFill = document.getElementById('progressFill');
         const messageDiv = document.getElementById('message');
         const filesContainer = document.getElementById('filesContainer');
         const statsDiv = document.getElementById('stats');
+
+        // Event listeners
+        uploadBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        });
 
         // Drag and drop functionality
         uploadArea.addEventListener('dragover', (e) => {
@@ -452,7 +465,8 @@ app.get('/', (req, res) => {
             uploadArea.classList.add('dragover');
         });
 
-        uploadArea.addEventListener('dragleave', () => {
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
             uploadArea.classList.remove('dragover');
         });
 
@@ -463,8 +477,11 @@ app.get('/', (req, res) => {
             handleFiles(files);
         });
 
-        uploadArea.addEventListener('click', () => {
-            fileInput.click();
+        uploadArea.addEventListener('click', (e) => {
+            // Não abrir o file input se clicou no botão
+            if (e.target.id !== 'uploadBtn') {
+                fileInput.click();
+            }
         });
 
         fileInput.addEventListener('change', (e) => {
@@ -503,6 +520,8 @@ app.get('/', (req, res) => {
                     const response = JSON.parse(xhr.responseText);
                     showMessage(response.message, 'success');
                     loadFiles();
+                    // Limpar o input
+                    fileInput.value = '';
                 } else {
                     const error = JSON.parse(xhr.responseText);
                     showMessage(error.error || 'Erro no upload', 'error');
@@ -534,6 +553,7 @@ app.get('/', (req, res) => {
                 })
                 .catch(error => {
                     filesContainer.innerHTML = '<div class="loading">Erro ao carregar arquivos</div>';
+                    console.error('Erro ao carregar arquivos:', error);
                 });
         }
 
@@ -620,6 +640,7 @@ app.get('/', (req, res) => {
                 })
                 .catch(error => {
                     showMessage('Erro ao excluir arquivo', 'error');
+                    console.error('Erro ao excluir arquivo:', error);
                 });
         }
 
@@ -636,7 +657,7 @@ app.get('/', (req, res) => {
         }
 
         // Carregar arquivos quando a página carregar
-        window.addEventListener('load', () => {
+        document.addEventListener('DOMContentLoaded', function() {
             loadFiles();
         });
     </script>
