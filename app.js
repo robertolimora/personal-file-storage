@@ -53,7 +53,6 @@ const upload = multer({
     const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|zip|rar|mp3|mp4|avi/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -73,7 +72,6 @@ function loadExistingFiles() {
       files.forEach(filename => {
         const filePath = path.join(uploadsDir, filename);
         const stats = fs.statSync(filePath);
-        
         // Verificar se já existe no banco
         const exists = fileDatabase.find(f => f.filename === filename);
         if (!exists) {
@@ -101,528 +99,551 @@ app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meus Arquivos Pessoais</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meus Arquivos Pessoais</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
-        }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: #333;
+    }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
 
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-            color: white;
-        }
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      color: white;
+    }
 
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
+    .header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
 
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
+    .header p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
 
-        .upload-section {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
+    .upload-section {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease;
+    }
 
-        .upload-section:hover {
-            transform: translateY(-5px);
-        }
+    .upload-section:hover {
+      transform: translateY(-5px);
+    }
 
-        .upload-area {
-            border: 3px dashed #667eea;
-            border-radius: 15px;
-            padding: 40px;
-            text-align: center;
-            background: #f8f9ff;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
+    .upload-area {
+      border: 3px dashed #667eea;
+      border-radius: 15px;
+      padding: 40px;
+      text-align: center;
+      background: #f8f9ff;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
 
-        .upload-area:hover {
-            border-color: #764ba2;
-            background: #f0f2ff;
-        }
+    .upload-area:hover {
+      border-color: #764ba2;
+      background: #f0f2ff;
+    }
 
-        .upload-area.dragover {
-            border-color: #764ba2;
-            background: #e8ebff;
-            transform: scale(1.02);
-        }
+    .upload-area.dragover {
+      border-color: #764ba2;
+      background: #e8ebff;
+      transform: scale(1.02);
+    }
 
-        .upload-icon {
-            font-size: 3rem;
-            color: #667eea;
-            margin-bottom: 15px;
-        }
+    .upload-icon {
+      font-size: 3rem;
+      color: #667eea;
+      margin-bottom: 15px;
+    }
 
-        .upload-text {
-            font-size: 1.2rem;
-            color: #666;
-            margin-bottom: 20px;
-        }
+    .upload-text {
+      font-size: 1.2rem;
+      color: #666;
+      margin-bottom: 20px;
+    }
 
-        .file-input {
-            display: none;
-        }
+    .file-input {
+      display: none;
+    }
 
-        .upload-btn {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 25px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
-        }
+    .upload-btn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 25px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+    }
 
-        .upload-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102,126,234,0.6);
-        }
+    .upload-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102,126,234,0.6);
+    }
 
-        .files-section {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
+    .files-section {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
 
-        .files-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-        }
+    .files-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #f0f0f0;
+    }
 
-        .files-title {
-            font-size: 1.5rem;
-            color: #333;
-        }
+    .files-title {
+      font-size: 1.5rem;
+      color: #333;
+    }
 
-        .stats {
-            display: flex;
-            gap: 20px;
-            font-size: 0.9rem;
-            color: #666;
-        }
+    .stats {
+      display: flex;
+      gap: 20px;
+      font-size: 0.9rem;
+      color: #666;
+    }
 
-        .files-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
-        }
+    .files-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
 
-        .file-card {
-            background: #f8f9ff;
-            border-radius: 15px;
-            padding: 20px;
-            border: 1px solid #e0e0e0;
-            transition: all 0.3s ease;
-            position: relative;
-        }
+    .file-card {
+      background: #f8f9ff;
+      border-radius: 15px;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      transition: all 0.3s ease;
+      position: relative;
+    }
 
-        .file-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
+    .file-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
 
-        .file-icon {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-align: center;
-        }
+    .file-icon {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      text-align: center;
+    }
 
-        .file-name {
-            font-weight: bold;
-            margin-bottom: 5px;
-            word-break: break-word;
-            color: #333;
-        }
+    .file-name {
+      font-weight: bold;
+      margin-bottom: 5px;
+      word-break: break-word;
+      color: #333;
+    }
 
-        .file-info {
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 15px;
-        }
+    .file-info {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 15px;
+    }
 
-        .file-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
+    .file-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
 
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-        }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+    }
 
-        .btn-download {
-            background: #28a745;
-            color: white;
-        }
+    .btn-download {
+      background: #28a745;
+      color: white;
+    }
 
-        .btn-download:hover {
-            background: #218838;
-            transform: translateY(-1px);
-        }
+    .btn-download:hover {
+      background: #218838;
+      transform: translateY(-1px);
+    }
 
-        .btn-delete {
-            background: #dc3545;
-            color: white;
-        }
+    .btn-delete {
+      background: #dc3545;
+      color: white;
+    }
 
-        .btn-delete:hover {
-            background: #c82333;
-            transform: translateY(-1px);
-        }
+    .btn-delete:hover {
+      background: #c82333;
+      transform: translateY(-1px);
+    }
 
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
 
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
 
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: 4px;
-            margin: 20px 0;
-            overflow: hidden;
-            display: none;
-        }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e0e0e0;
+      border-radius: 4px;
+      margin: 20px 0;
+      overflow: hidden;
+      display: none;
+    }
 
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 4px;
-            transition: width 0.3s ease;
-            width: 0;
-        }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 0;
+    }
 
-        .message {
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            font-weight: 500;
-        }
+    .message {
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-weight: 500;
+    }
 
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
 
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
-            }
-            
-            .upload-section, .files-section {
-                padding: 20px;
-            }
-            
-            .files-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .stats {
-                flex-direction: column;
-                gap: 10px;
-                text-align: center;
-            }
-        }
-    </style>
+    @media (max-width: 768px) {
+      .container {
+        padding: 10px;
+      }
+      .header h1 {
+        font-size: 2rem;
+      }
+      .upload-section, .files-section {
+        padding: 20px;
+      }
+      .files-grid {
+        grid-template-columns: 1fr;
+      }
+      .stats {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>☁️ Meus Arquivos Pessoais</h1>
-            <p>Acesse seus arquivos de qualquer lugar do mundo</p>
-        </div>
-
-        <div class="upload-section">
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📁</div>
-                <div class="upload-text">
-                    Arraste seus arquivos aqui ou clique para selecionar
-                </div>
-                <input type="file" id="fileInput" class="file-input" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip,.rar,.mp3,.mp4,.avi">
-                <button class="upload-btn">
-                    Escolher Arquivos
-                </button>
-            </div>
-            <div class="progress-bar" id="progressBar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            <div id="message"></div>
-        </div>
-
-        <div class="files-section">
-            <div class="files-header">
-                <h2 class="files-title">📂 Meus Arquivos</h2>
-                <div class="stats" id="stats">
-                    <div>Total: <span id="totalFiles">0</span> arquivos</div>
-                    <div>Espaço: <span id="totalSize">0 B</span></div>
-                </div>
-            </div>
-            <div id="filesContainer">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    Carregando arquivos...
-                </div>
-            </div>
-        </div>
+  <div class="container">
+    <div class="header">
+      <h1>☁️ Meus Arquivos Pessoais</h1>
+      <p>Acesse seus arquivos de qualquer lugar do mundo</p>
     </div>
 
-    <script>
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const progressBar = document.getElementById('progressBar');
-        const progressFill = document.getElementById('progressFill');
-        const messageDiv = document.getElementById('message');
-        const filesContainer = document.getElementById('filesContainer');
-        const statsDiv = document.getElementById('stats');
+    <div class="upload-section">
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">📁</div>
+        <div class="upload-text" id="uploadText">
+          Arraste seus arquivos aqui ou clique para selecionar
+        </div>
+        <input type="file" id="fileInput" class="file-input" multiple
+               accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip,.rar,.mp3,.mp4,.avi">
+        <button class="upload-btn" id="uploadButton">
+          Escolher Arquivos
+        </button>
+      </div>
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div id="message"></div>
+    </div>
 
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
+    <div class="files-section">
+      <div class="files-header">
+        <h2 class="files-title">📂 Meus Arquivos</h2>
+        <div class="stats" id="stats">
+          <div>Total: <span id="totalFiles">0</span> arquivos</div>
+          <div>Espaço: <span id="totalSize">0 B</span></div>
+        </div>
+      </div>
+      <div id="filesContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          Carregando arquivos...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const uploadButton = document.getElementById('uploadButton');
+    const uploadText = document.getElementById('uploadText');
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const messageDiv = document.getElementById('message');
+    const filesContainer = document.getElementById('filesContainer');
+    const statsDiv = document.getElementById('stats');
+
+    // Drag and drop functionality
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      handleFiles(files);
+    });
+
+    // Evento do botão de upload
+    uploadButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      e.stopPropagation();
+      if (e.target.files.length > 0) {
+        uploadText.textContent = `${e.target.files.length} arquivo(s) selecionado(s)`;
+      }
+      handleFiles(e.target.files);
+    });
+
+    function handleFiles(files) {
+      if (files.length === 0) return;
+
+      const formData = new FormData();
+      for (let file of files) {
+        formData.append('files', file);
+      }
+
+      uploadFiles(formData);
+    }
+
+    function uploadFiles(formData) {
+      progressBar.style.display = 'block';
+      messageDiv.innerHTML = '';
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          progressFill.style.width = percentComplete + '%';
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        progressBar.style.display = 'none';
+        progressFill.style.width = '0%';
+        uploadText.textContent = 'Arraste seus arquivos aqui ou clique para selecionar';
+
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          showMessage(response.message, 'success');
+          loadFiles();
+        } else {
+          const error = JSON.parse(xhr.responseText);
+          showMessage(error.error || 'Erro no upload', 'error');
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        progressBar.style.display = 'none';
+        showMessage('Erro de conexão', 'error');
+      });
+
+      xhr.open('POST', '/upload');
+      xhr.send(formData);
+    }
+
+    function showMessage(text, type) {
+      messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+      setTimeout(() => {
+        messageDiv.innerHTML = '';
+      }, 5000);
+    }
+
+    function loadFiles() {
+      fetch('/files')
+        .then(response => response.json())
+        .then(files => {
+          displayFiles(files);
+          updateStats();
+        })
+        .catch(error => {
+          filesContainer.innerHTML = '<div class="loading">Erro ao carregar arquivos</div>';
         });
+    }
 
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
+    function displayFiles(files) {
+      if (files.length === 0) {
+        filesContainer.innerHTML = '<div class="loading">Nenhum arquivo encontrado</div>';
+        return;
+      }
 
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            handleFiles(files);
-        });
-        
-        uploadArea.addEventListener('click', () => {
-            fileInput.click();
-        });
+      const filesGrid = document.createElement('div');
+      filesGrid.className = 'files-grid';
 
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-        });
+      files.forEach(file => {
+        const fileCard = createFileCard(file);
+        filesGrid.appendChild(fileCard);
+      });
 
-        function handleFiles(files) {
-            if (files.length === 0) return;
-            const formData = new FormData();
-            for (let file of files) {
-                formData.append('files', file);
-            }
-            uploadFiles(formData);
-        }
+      filesContainer.innerHTML = '';
+      filesContainer.appendChild(filesGrid);
+    }
 
-        function uploadFiles(formData) {
-            progressBar.style.display = 'block';
-            messageDiv.innerHTML = '';
-            const xhr = new XMLHttpRequest();
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    progressFill.style.width = percentComplete + '%';
-                }
-            });
-            xhr.addEventListener('load', () => {
-                progressBar.style.display = 'none';
-                progressFill.style.width = '0%';
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    showMessage(response.message, 'success');
-                    loadFiles();
-                } else {
-                    const error = JSON.parse(xhr.responseText);
-                    showMessage(error.error || 'Erro no upload', 'error');
-                }
-            });
-            xhr.addEventListener('error', () => {
-                progressBar.style.display = 'none';
-                showMessage('Erro de conexão', 'error');
-            });
-            xhr.open('POST', '/upload');
-            xhr.send(formData);
-        }
+    function createFileCard(file) {
+      const card = document.createElement('div');
+      card.className = 'file-card';
 
-        function showMessage(text, type) {
-            messageDiv.innerHTML = \`<div class="message \${type}">\${text}</div>\`;
-            setTimeout(() => {
-                messageDiv.innerHTML = '';
-            }, 5000);
-        }
+      const icon = getFileIcon(file.type);
+      const date = new Date(file.uploadDate).toLocaleDateString('pt-BR');
+      const size = formatBytes(file.size);
 
-        function loadFiles() {
-            fetch('/files')
-                .then(response => response.json())
-                .then(files => {
-                    displayFiles(files);
-                    updateStats();
-                })
-                .catch(error => {
-                    filesContainer.innerHTML = '<div class="loading">Erro ao carregar arquivos</div>';
-                });
-        }
+      card.innerHTML = `
+        <div class="file-icon">${icon}</div>
+        <div class="file-name" title="${file.originalName}">${truncateText(file.originalName, 30)}</div>
+        <div class="file-info">
+          <div>📅 ${date}</div>
+          <div>📦 ${size}</div>
+        </div>
+        <div class="file-actions">
+          <a href="/download/${file.id}" class="btn btn-download" download>
+            ⬇️ Baixar
+          </a>
+          <button class="btn btn-delete" onclick="deleteFile('${file.id}')">
+            🗑️ Excluir
+          </button>
+        </div>
+      `;
 
-        function displayFiles(files) {
-            if (files.length === 0) {
-                filesContainer.innerHTML = '<div class="loading">Nenhum arquivo encontrado</div>';
-                return;
-            }
-            const filesGrid = document.createElement('div');
-            filesGrid.className = 'files-grid';
-            files.forEach(file => {
-                const fileCard = createFileCard(file);
-                filesGrid.appendChild(fileCard);
-            });
-            filesContainer.innerHTML = '';
-            filesContainer.appendChild(filesGrid);
-        }
+      return card;
+    }
 
-        function createFileCard(file) {
-            const card = document.createElement('div');
-            card.className = 'file-card';
-            const icon = getFileIcon(file.type);
-            const date = new Date(file.uploadDate).toLocaleDateString('pt-BR');
-            const size = formatBytes(file.size);
-            card.innerHTML = \`
-                <div class="file-icon">\${icon}</div>
-                <div class="file-name" title="\${file.originalName}">\${truncateText(file.originalName, 30)}</div>
-                <div class="file-info">
-                    <div>📅 \${date}</div>
-                    <div>📦 \${size}</div>
-                </div>
-                <div class="file-actions">
-                    <a href="/download/\${file.id}" class="btn btn-download" download>
-                        ⬇️ Baixar
-                    </a>
-                    <button class="btn btn-delete" onclick="deleteFile('\${file.id}')">
-                        🗑️ Excluir
-                    </button>
-                </div>
-            \`;
-            return card;
-        }
+    function getFileIcon(type) {
+      const iconMap = {
+        '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️', '.gif': '🖼️',
+        '.pdf': '📄', '.doc': '📝', '.docx': '📝', '.txt': '📝',
+        '.zip': '🗜️', '.rar': '🗜️',
+        '.mp3': '🎵', '.mp4': '🎬', '.avi': '🎬'
+      };
+      return iconMap[type.toLowerCase()] || '📄';
+    }
 
-        function getFileIcon(type) {
-            const iconMap = {
-                '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️', '.gif': '🖼️',
-                '.pdf': '📄', '.doc': '📝', '.docx': '📝', '.txt': '📝',
-                '.zip': '🗜️', '.rar': '🗜️',
-                '.mp3': '🎵', '.mp4': '🎬', '.avi': '🎬'
-            };
-            return iconMap[type.toLowerCase()] || '📄';
-        }
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
 
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
+    function truncateText(text, maxLength) {
+      return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    }
 
-        function truncateText(text, maxLength) {
-            return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-        }
+    function deleteFile(fileId) {
+      if (!confirm('Tem certeza que deseja excluir este arquivo?')) return;
 
-        function deleteFile(fileId) {
-            if (!confirm('Tem certeza que deseja excluir este arquivo?')) return;
-            fetch(\`/delete/\${fileId}\`, { method: 'DELETE' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.message) {
-                        showMessage(data.message, 'success');
-                        loadFiles();
-                    } else {
-                        showMessage(data.error, 'error');
-                    }
-                })
-                .catch(error => {
-                    showMessage('Erro ao excluir arquivo', 'error');
-                });
-        }
-
-        function updateStats() {
-            fetch('/stats')
-                .then(response => response.json())
-                .then(stats => {
-                    document.getElementById('totalFiles').textContent = stats.totalFiles;
-                    document.getElementById('totalSize').textContent = stats.totalSize;
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar estatísticas:', error);
-                });
-        }
-        
-        window.addEventListener('load', () => {
+      fetch(`/delete/${fileId}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.message) {
+            showMessage(data.message, 'success');
             loadFiles();
+          } else {
+            showMessage(data.error, 'error');
+          }
+        })
+        .catch(error => {
+          showMessage('Erro ao excluir arquivo', 'error');
         });
-    </script>
+    }
+
+    function updateStats() {
+      fetch('/stats')
+        .then(response => response.json())
+        .then(stats => {
+          document.getElementById('totalFiles').textContent = stats.totalFiles;
+          document.getElementById('totalSize').textContent = stats.totalSize;
+        })
+        .catch(error => {
+          console.error('Erro ao carregar estatísticas:', error);
+        });
+    }
+
+    // Carregar arquivos quando a página carregar
+    window.addEventListener('load', () => {
+      loadFiles();
+    });
+  </script>
 </body>
 </html>`);
 });
@@ -643,7 +664,6 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
         uploadDate: new Date(),
         type: path.extname(file.originalname).toLowerCase()
       };
-      
       fileDatabase.push(fileInfo);
       return fileInfo;
     });
@@ -661,6 +681,7 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
 // Listar arquivos
 app.get('/files', (req, res) => {
   try {
+    // Ordenar por data de upload (mais recente primeiro)
     const sortedFiles = fileDatabase.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
     res.json(sortedFiles);
   } catch (error) {
@@ -674,17 +695,13 @@ app.get('/download/:id', (req, res) => {
   try {
     const fileId = req.params.id;
     const fileInfo = fileDatabase.find(f => f.id === fileId);
-    
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
-    
     const filePath = path.join(uploadsDir, fileInfo.filename);
-    
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Arquivo físico não encontrado' });
     }
-    
     res.download(filePath, fileInfo.originalName);
   } catch (error) {
     console.error('Erro no download:', error);
@@ -697,20 +714,21 @@ app.delete('/delete/:id', (req, res) => {
   try {
     const fileId = req.params.id;
     const fileIndex = fileDatabase.findIndex(f => f.id === fileId);
-    
     if (fileIndex === -1) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
-    
+
     const fileInfo = fileDatabase[fileIndex];
     const filePath = path.join(uploadsDir, fileInfo.filename);
-    
+
+    // Remover arquivo físico
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
-    
+
+    // Remover do banco
     fileDatabase.splice(fileIndex, 1);
-    
+
     res.json({ message: 'Arquivo deletado com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar arquivo:', error);
@@ -723,7 +741,6 @@ app.get('/stats', (req, res) => {
   try {
     const totalFiles = fileDatabase.length;
     const totalSize = fileDatabase.reduce((sum, file) => sum + file.size, 0);
-    
     res.json({
       totalFiles,
       totalSize: formatBytes(totalSize),
@@ -751,7 +768,7 @@ function getDiskSpace() {
     const stats = fs.statSync(uploadsDir);
     return {
       used: formatBytes(fileDatabase.reduce((sum, file) => sum + file.size, 0)),
-      available: "N/A"
+      available: "Unlimited (Render.com)"
     };
   } catch (error) {
     return { used: "0 Bytes", available: "Unknown" };
@@ -768,11 +785,9 @@ app.use((error, req, res, next) => {
       return res.status(400).json({ error: 'Muitos arquivos (máximo 5)' });
     }
   }
-  
   if (error.message === 'Tipo de arquivo não permitido') {
     return res.status(400).json({ error: 'Tipo de arquivo não permitido' });
   }
-  
   console.error('Erro não tratado:', error);
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
