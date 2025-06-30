@@ -410,8 +410,7 @@ app.get('/', (req, res) => {
                     Arraste seus arquivos aqui ou clique para selecionar
                 </div>
                 <input type="file" id="fileInput" class="file-input" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.zip,.rar,.mp3,.mp4,.avi">
-                
-                <button class="upload-btn"> 
+                <button class="upload-btn">
                     Escolher Arquivos
                 </button>
             </div>
@@ -447,7 +446,6 @@ app.get('/', (req, res) => {
         const filesContainer = document.getElementById('filesContainer');
         const statsDiv = document.getElementById('stats');
 
-        // Drag and drop functionality
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -464,7 +462,6 @@ app.get('/', (req, res) => {
             handleFiles(files);
         });
         
-        // Este listener agora gerencia o clique em TODA a área, incluindo o botão.
         uploadArea.addEventListener('click', () => {
             fileInput.click();
         });
@@ -475,32 +472,26 @@ app.get('/', (req, res) => {
 
         function handleFiles(files) {
             if (files.length === 0) return;
-
             const formData = new FormData();
             for (let file of files) {
                 formData.append('files', file);
             }
-
             uploadFiles(formData);
         }
 
         function uploadFiles(formData) {
             progressBar.style.display = 'block';
             messageDiv.innerHTML = '';
-
             const xhr = new XMLHttpRequest();
-
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total) * 100;
                     progressFill.style.width = percentComplete + '%';
                 }
             });
-
             xhr.addEventListener('load', () => {
                 progressBar.style.display = 'none';
                 progressFill.style.width = '0%';
-
                 if (xhr.status === 200) {
                     const response = JSON.parse(xhr.responseText);
                     showMessage(response.message, 'success');
@@ -510,12 +501,10 @@ app.get('/', (req, res) => {
                     showMessage(error.error || 'Erro no upload', 'error');
                 }
             });
-
             xhr.addEventListener('error', () => {
                 progressBar.style.display = 'none';
                 showMessage('Erro de conexão', 'error');
             });
-
             xhr.open('POST', '/upload');
             xhr.send(formData);
         }
@@ -544,15 +533,12 @@ app.get('/', (req, res) => {
                 filesContainer.innerHTML = '<div class="loading">Nenhum arquivo encontrado</div>';
                 return;
             }
-
             const filesGrid = document.createElement('div');
             filesGrid.className = 'files-grid';
-
             files.forEach(file => {
                 const fileCard = createFileCard(file);
                 filesGrid.appendChild(fileCard);
             });
-
             filesContainer.innerHTML = '';
             filesContainer.appendChild(filesGrid);
         }
@@ -560,11 +546,9 @@ app.get('/', (req, res) => {
         function createFileCard(file) {
             const card = document.createElement('div');
             card.className = 'file-card';
-
             const icon = getFileIcon(file.type);
             const date = new Date(file.uploadDate).toLocaleDateString('pt-BR');
             const size = formatBytes(file.size);
-
             card.innerHTML = \`
                 <div class="file-icon">\${icon}</div>
                 <div class="file-name" title="\${file.originalName}">\${truncateText(file.originalName, 30)}</div>
@@ -581,7 +565,6 @@ app.get('/', (req, res) => {
                     </button>
                 </div>
             \`;
-
             return card;
         }
 
@@ -609,7 +592,6 @@ app.get('/', (req, res) => {
 
         function deleteFile(fileId) {
             if (!confirm('Tem certeza que deseja excluir este arquivo?')) return;
-
             fetch(\`/delete/\${fileId}\`, { method: 'DELETE' })
                 .then(response => response.json())
                 .then(data => {
@@ -636,8 +618,7 @@ app.get('/', (req, res) => {
                     console.error('Erro ao carregar estatísticas:', error);
                 });
         }
-
-        // Carregar arquivos quando a página carregar
+        
         window.addEventListener('load', () => {
             loadFiles();
         });
@@ -680,7 +661,6 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
 // Listar arquivos
 app.get('/files', (req, res) => {
   try {
-    // Ordenar por data de upload (mais recente primeiro)
     const sortedFiles = fileDatabase.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
     res.json(sortedFiles);
   } catch (error) {
@@ -725,12 +705,10 @@ app.delete('/delete/:id', (req, res) => {
     const fileInfo = fileDatabase[fileIndex];
     const filePath = path.join(uploadsDir, fileInfo.filename);
     
-    // Remover arquivo físico
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
     
-    // Remover do banco
     fileDatabase.splice(fileIndex, 1);
     
     res.json({ message: 'Arquivo deletado com sucesso' });
@@ -773,7 +751,7 @@ function getDiskSpace() {
     const stats = fs.statSync(uploadsDir);
     return {
       used: formatBytes(fileDatabase.reduce((sum, file) => sum + file.size, 0)),
-      available: "Unlimited (Render.com)"
+      available: "N/A"
     };
   } catch (error) {
     return { used: "0 Bytes", available: "Unknown" };
@@ -801,7 +779,7 @@ app.use((error, req, res, next) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(\`🚀 Servidor rodando na porta \${PORT}\`);
-  console.log(\`📁 Diretório de uploads: \${uploadsDir}\`);
-  console.log(\`📊 \${fileDatabase.length} arquivos carregados\`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`📁 Diretório de uploads: ${uploadsDir}`);
+  console.log(`📊 ${fileDatabase.length} arquivos carregados`);
 });
