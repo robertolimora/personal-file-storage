@@ -136,6 +136,19 @@
       color: #666;
     }
 
+.files-tools {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    #searchInput {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
+    }
+    
     .files-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -324,6 +337,11 @@
           <div>Total: <span id="totalFiles">0</span> arquivos</div>
           <div>Espaço: <span id="totalSize">0 B</span></div>
         </div>
+      </div>
+      <div class="files-tools">
+        <input type="text" id="searchInput" placeholder="Pesquisar arquivos">
+        <button class="upload-btn" id="createDirBtn" type="button">Nova Pasta</button>
+        <button class="upload-btn" id="deleteDirBtn" type="button">Excluir Pasta</button>
       </div>
       <div id="filesContainer">
         <div class="loading">
