@@ -7,4 +7,10 @@ describe('GET /files', () => {
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
+
+   it('should allow searching files', async () => {
+    const res = await request(app).get('/files?search=test');
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
 });
