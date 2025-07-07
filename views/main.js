@@ -6,7 +6,10 @@ const uploadArea = document.getElementById('uploadArea');
     const progressFill = document.getElementById('progressFill');
     const messageDiv = document.getElementById('message');
     const filesContainer = document.getElementById('filesContainer');
+const directoriesContainer = document.getElementById('directoriesContainer');
+    const breadcrumb = document.getElementById('breadcrumb');
     const statsDiv = document.getElementById('stats');
+let currentDir = '';
 
     // Drag and drop functionality
     uploadArea.addEventListener('dragover', (e) => {
@@ -102,7 +105,7 @@ const uploadArea = document.getElementById('uploadArea');
     }
 
     function loadFiles() {
-      fetch('/files')
+      fetch(`/files?dir=${encodeURIComponent(currentDir)}`)
         .then(response => response.json())
         .then(files => {
           displayFiles(files);
@@ -225,33 +228,92 @@ const uploadArea = document.getElementById('uploadArea');
     document.getElementById('createDirBtn').addEventListener('click', () => {
       const name = prompt('Nome da nova pasta:');
       if (!name) return;
+         const fullPath = currentDir ? `${currentDir}/${name}` : name;
       fetch('/directories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+       body: JSON.stringify({ name: fullPath })
       })
         .then(response => response.json())
-        .then(data => showMessage(data.message || data.error, data.message ? 'success' : 'error'))
+        .then(data => {
+          showMessage(data.message || data.error, data.message ? 'success' : 'error');
+          if (data.message) loadDirectories();
+        })
         .catch(() => showMessage('Erro ao criar diretório', 'error'));
     });
 
     document.getElementById('deleteDirBtn').addEventListener('click', () => {
       const name = prompt('Nome da pasta a excluir:');
       if (!name) return;
-      fetch(`/directories/${encodeURIComponent(name)}`, {
+     const fullPath = currentDir ? `${currentDir}/${name}` : name;
+      fetch(`/directories/${encodeURIComponent(fullPath)}`, {
         method: 'DELETE'
       })
         .then(response => response.json())
-        .then(data => showMessage(data.message || data.error, data.message ? 'success' : 'error'))
+        .then(data => {
+          showMessage(data.message || data.error, data.message ? 'success' : 'error');
+          if (data.message) loadDirectories();
+        })
         .catch(() => showMessage('Erro ao excluir diretório', 'error'));
     });
+function loadDirectories() {
+      fetch(`/directories?dir=${encodeURIComponent(currentDir)}`)
+        .then(response => response.json())
+        .then(dirs => displayDirectories(dirs))
+        .catch(() => { directoriesContainer.innerHTML = ''; });
+    }
+
+    function displayDirectories(dirs) {
+      if (!Array.isArray(dirs) || dirs.length === 0) {
+        directoriesContainer.innerHTML = '';
+        return;
+      }
+      const grid = document.createElement('div');
+      grid.className = 'files-grid';
+      dirs.forEach(name => {
+        const card = document.createElement('div');
+        card.className = 'directory-card';
+        card.textContent = `📁 ${name}`;
+        card.addEventListener('click', () => changeDirectory(name));
+        grid.appendChild(card);
+      });
+      directoriesContainer.innerHTML = '';
+      directoriesContainer.appendChild(grid);
+    }
+
+    function changeDirectory(name) {
+      currentDir = currentDir ? `${currentDir}/${name}` : name;
+      updateBreadcrumb();
+      loadDirectories();
+      loadFiles();
+    }
+
+    function updateBreadcrumb() {
+      const parts = currentDir ? currentDir.split('/') : [];
+      let html = '<span class="crumb" data-path="">Home</span>';
+      let path = '';
+      parts.forEach((p, i) => {
+        path += (i > 0 ? '/' : '') + p;
+        html += ` / <span class="crumb" data-path="${path}">${p}</span>`;
+      });
+      breadcrumb.innerHTML = html;
+      document.querySelectorAll('.crumb').forEach(el => {
+        el.addEventListener('click', () => {
+          currentDir = el.getAttribute('data-path');
+          updateBreadcrumb();
+          loadDirectories();
+          loadFiles();
+        });
+      });
+    }
+
 
     document.getElementById('searchInput').addEventListener('input', (e) => {
       loadFilesWithQuery(e.target.value);
     });
 
     function loadFilesWithQuery(query) {
-      fetch(`/files?search=${encodeURIComponent(query)}`)
+      fetch(`/files?dir=${encodeURIComponent(currentDir)}&search=${encodeURIComponent(query)}`)
         .then(response => response.json())
         .then(files => {
           displayFiles(files);
@@ -277,5 +339,7 @@ const uploadArea = document.getElementById('uploadArea');
 
     // Carregar arquivos quando a página carregar
     window.addEventListener('load', () => {
+        updateBreadcrumb();
+      loadDirectories();
       loadFiles();
  });
