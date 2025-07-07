@@ -155,6 +155,32 @@
       gap: 20px;
     }
 
+    .directory-card {
+      background: #fffbe6;
+      border-radius: 15px;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .directory-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+
+    .breadcrumb {
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    .breadcrumb span {
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
     .file-card {
       background: #f8f9ff;
       border-radius: 15px;
@@ -343,6 +369,8 @@
         <button class="upload-btn" id="createDirBtn" type="button">Nova Pasta</button>
         <button class="upload-btn" id="deleteDirBtn" type="button">Excluir Pasta</button>
       </div>
+       <div class="breadcrumb" id="breadcrumb"></div>
+      <div id="directoriesContainer"></div>
       <div id="filesContainer">
         <div class="loading">
           <div class="spinner"></div>
