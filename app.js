@@ -209,6 +209,38 @@ app.patch('/rename/:id', (req, res) => {
   }
 });
 
+// Mover arquivo para outra pasta
+app.patch('/move/:id', (req, res) => {
+  try {
+    const fileId = req.params.id;
+    let { newDir } = req.body;
+    if (newDir === undefined) {
+      return res.status(400).json({ error: 'Diretório alvo é obrigatório' });
+    }
+    newDir = path.normalize(newDir).replace(/^([\.\/])+/, '');
+    const fileInfo = fileDatabase.find(f => f.id === fileId);
+    if (!fileInfo) {
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
+    }
+    const destDir = path.join(uploadsDir, newDir);
+    if (!destDir.startsWith(uploadsDir)) {
+      return res.status(400).json({ error: 'Diretório inválido' });
+    }
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+    const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
+    const newPath = path.join(destDir, fileInfo.filename);
+    fs.renameSync(oldPath, newPath);
+    fileInfo.directory = newDir;
+    fileInfo.path = path.join(newDir, fileInfo.filename);
+    res.json({ message: 'Arquivo movido com sucesso' });
+  } catch (error) {
+    console.error('Erro ao mover arquivo:', error);
+    res.status(500).json({ error: 'Erro ao mover arquivo' });
+  }
+});
+
 // Download de arquivo
 app.get('/download/:id', (req, res) => {
   try {
