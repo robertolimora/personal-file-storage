@@ -129,14 +129,51 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
   }
 });
 
-// Listar arquivos
+// Listar arquivos com opcao de busca
 app.get('/files', (req, res) => {
   try {
-    const sortedFiles = fileDatabase.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+    const query = (req.query.search || '').toLowerCase();
+    let files = fileDatabase;
+    if (query) {
+      files = files.filter(f => f.originalName.toLowerCase().includes(query));
+    }
+    const sortedFiles = files.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
     res.json(sortedFiles);
   } catch (error) {
     console.error('Erro ao listar arquivos:', error);
     res.status(500).json({ error: 'Erro ao listar arquivos' });
+  }
+});
+
+// Renomear arquivo
+app.patch('/rename/:id', (req, res) => {
+  try {
+    const fileId = req.params.id;
+    const { newName } = req.body;
+    if (!newName) {
+      return res.status(400).json({ error: 'Novo nome obrigatório' });
+    }
+    const fileInfo = fileDatabase.find(f => f.id === fileId);
+    if (!fileInfo) {
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
+    }
+    const ext = path.extname(newName);
+    const base = path.basename(newName, ext);
+    const currentExt = path.extname(fileInfo.filename);
+    const unique = path.basename(fileInfo.filename, currentExt).split('-').pop();
+    const newFileName = `${base}-${unique}${ext || currentExt}`;
+    const oldPath = path.join(uploadsDir, fileInfo.filename);
+    const newPath = path.join(uploadsDir, newFileName);
+    fs.renameSync(oldPath, newPath);
+
+    fileInfo.filename = newFileName;
+    fileInfo.originalName = newName;
+    fileInfo.type = ext.toLowerCase() || currentExt.toLowerCase();
+
+    res.json({ message: 'Arquivo renomeado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao renomear arquivo:', error);
+    res.status(500).json({ error: 'Erro ao renomear arquivo' });
   }
 });
 
@@ -182,6 +219,44 @@ app.delete('/delete/:id', (req, res) => {
     res.status(500).json({ error: 'Erro ao deletar arquivo' });
   }
 });
+
+// Criar diretório
+app.post('/directories', (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Nome do diretório é obrigatório' });
+    }
+    const safeName = path.basename(name);
+    const dirPath = path.join(uploadsDir, safeName);
+    if (fs.existsSync(dirPath)) {
+      return res.status(400).json({ error: 'Diretório já existe' });
+    }
+    fs.mkdirSync(dirPath, { recursive: true });
+    res.json({ message: 'Diretório criado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao criar diretório:', error);
+    res.status(500).json({ error: 'Erro ao criar diretório' });
+  }
+});
+
+// Deletar diretório
+app.delete('/directories/:name', (req, res) => {
+  try {
+    const safeName = path.basename(req.params.name);
+    const dirPath = path.join(uploadsDir, safeName);
+    if (!fs.existsSync(dirPath)) {
+      return res.status(404).json({ error: 'Diretório não encontrado' });
+    }
+    fs.rmSync(dirPath, { recursive: true, force: true });
+    fileDatabase = fileDatabase.filter(f => !f.filename.startsWith(`${safeName}/`));
+    res.json({ message: 'Diretório excluído com sucesso' });
+  } catch (error) {
+    console.error('Erro ao excluir diretório:', error);
+    res.status(500).json({ error: 'Erro ao excluir diretório' });
+  }
+});
+
 
 // Informações do sistema
 app.get('/stats', (req, res) => {
