@@ -131,6 +131,10 @@ O serviço inclui várias medidas de segurança:
 - Clique no botão "Excluir" (confirmação será solicitada)
 - O arquivo será removido permanentemente
 
+### Mover Arquivos
+- Utilize o botão "Mover" para escolher outra pasta
+- O arquivo será transferido para o diretório informado
+
 ## 🔄 Atualizações
 
 Para atualizar o serviço:
