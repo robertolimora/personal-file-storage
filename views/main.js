@@ -156,6 +156,9 @@ let currentDir = '';
           <button class="btn btn-download" onclick="renameFile('${file.id}')">
             ✏️ Renomear
           </button>
+          <button class="btn btn-move" onclick="moveFile('${file.id}')">
+            📂 Mover
+          </button>
           <button class="btn btn-delete" onclick="deleteFile('${file.id}')">
             🗑️ Excluir
           </button>
@@ -224,6 +227,28 @@ let currentDir = '';
         })
         .catch(() => showMessage('Erro ao renomear arquivo', 'error'));
     }
+
+function moveFile(fileId) {
+      const newDir = prompt('Mover para pasta (deixe vazio para a raiz):');
+      if (newDir === null) return;
+      fetch(`/move/${fileId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newDir })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.message) {
+            showMessage(data.message, 'success');
+            loadDirectories();
+            loadFiles();
+          } else {
+            showMessage(data.error, 'error');
+          }
+        })
+        .catch(() => showMessage('Erro ao mover arquivo', 'error'));
+    }
+
 
     document.getElementById('createDirBtn').addEventListener('click', () => {
       const name = prompt('Nome da nova pasta:');
