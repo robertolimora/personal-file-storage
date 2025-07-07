@@ -404,6 +404,7 @@
         progressBar.style.display = 'none';
         progressFill.style.width = '0%';
         uploadText.textContent = 'Arraste seus arquivos aqui ou clique para selecionar';
+        fileInput.value = '';
 
         if (xhr.status === 200) {
           const response = JSON.parse(xhr.responseText);
@@ -417,6 +418,7 @@
 
       xhr.addEventListener('error', () => {
         progressBar.style.display = 'none';
+        fileInput.value = '';
         showMessage('Erro de conexão', 'error');
       });
 
