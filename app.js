@@ -67,13 +67,16 @@ const upload = multer({
     files: 5 // máximo 5 arquivos por vez
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|zip|rar|mp3|mp4|avi/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    if (mimetype && extname) {
+    const allowedExt = [
+      '.jpeg', '.jpg', '.png', '.gif',
+      '.pdf', '.doc', '.docx', '.txt',
+      '.zip', '.rar', '.mp3', '.mp4', '.avi'
+    ];
+    const extname = path.extname(file.originalname).toLowerCase();
+    if (allowedExt.includes(extname)) {
       return cb(null, true);
-    } else {
-      cb(new Error('Tipo de arquivo não permitido'));
+      return cb(null, true);
+    cb(new Error('Tipo de arquivo não permitido'));
     }
   }
 });
