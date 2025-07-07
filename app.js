@@ -238,9 +238,13 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: 'Erro interno do servidor' });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`📁 Diretório de uploads: ${uploadsDir}`);
-  console.log(`📊 ${fileDatabase.length} arquivos carregados`);
-});
+// Iniciar servidor apenas se este arquivo for executado diretamente
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    console.log(`📁 Diretório de uploads: ${uploadsDir}`);
+    console.log(`📊 ${fileDatabase.length} arquivos carregados`);
+  });
+}
+
+module.exports = app;
