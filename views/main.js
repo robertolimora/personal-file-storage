@@ -214,3 +214,4 @@ const uploadArea = document.getElementById('uploadArea');
     // Carregar arquivos quando a página carregar
     window.addEventListener('load', () => {
       loadFiles();
+ });
