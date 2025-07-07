@@ -150,6 +150,9 @@ const uploadArea = document.getElementById('uploadArea');
           <a href="/download/${file.id}" class="btn btn-download" download>
             ⬇️ Baixar
           </a>
+          <button class="btn btn-download" onclick="renameFile('${file.id}')">
+            ✏️ Renomear
+          </button>
           <button class="btn btn-delete" onclick="deleteFile('${file.id}')">
             🗑️ Excluir
           </button>
@@ -198,6 +201,67 @@ const uploadArea = document.getElementById('uploadArea');
           showMessage('Erro ao excluir arquivo', 'error');
         });
     }
+
+ function renameFile(fileId) {
+      const newName = prompt('Novo nome do arquivo:');
+      if (!newName) return;
+      fetch(`/rename/${fileId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newName })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.message) {
+            showMessage(data.message, 'success');
+            loadFiles();
+          } else {
+            showMessage(data.error, 'error');
+          }
+        })
+        .catch(() => showMessage('Erro ao renomear arquivo', 'error'));
+    }
+
+    document.getElementById('createDirBtn').addEventListener('click', () => {
+      const name = prompt('Nome da nova pasta:');
+      if (!name) return;
+      fetch('/directories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
+        .then(response => response.json())
+        .then(data => showMessage(data.message || data.error, data.message ? 'success' : 'error'))
+        .catch(() => showMessage('Erro ao criar diretório', 'error'));
+    });
+
+    document.getElementById('deleteDirBtn').addEventListener('click', () => {
+      const name = prompt('Nome da pasta a excluir:');
+      if (!name) return;
+      fetch(`/directories/${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      })
+        .then(response => response.json())
+        .then(data => showMessage(data.message || data.error, data.message ? 'success' : 'error'))
+        .catch(() => showMessage('Erro ao excluir diretório', 'error'));
+    });
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      loadFilesWithQuery(e.target.value);
+    });
+
+    function loadFilesWithQuery(query) {
+      fetch(`/files?search=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(files => {
+          displayFiles(files);
+          updateStats();
+        })
+        .catch(() => {
+          filesContainer.innerHTML = '<div class="loading">Erro ao carregar arquivos</div>';
+        });
+    }
+
 
     function updateStats() {
       fetch('/stats')
