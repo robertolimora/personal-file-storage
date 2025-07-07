@@ -34,7 +34,23 @@ if (!fs.existsSync(uploadsDir)) {
 // Configuração do multer para upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir);
+    try {
+      let targetDir = uploadsDir;
+      const dir = (req.body.dir || '').replace(/\\/g, '/');
+      if (dir) {
+        const safePath = path.join(uploadsDir, dir);
+        if (!safePath.startsWith(uploadsDir)) {
+          return cb(new Error('Diretório inválido'));
+        }
+        if (!fs.existsSync(safePath)) {
+          fs.mkdirSync(safePath, { recursive: true });
+        }
+        targetDir = safePath;
+      }
+      cb(null, targetDir);
+    } catch (err) {
+      cb(err);
+    }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = crypto.randomBytes(8).toString('hex');
@@ -66,23 +82,30 @@ const upload = multer({
 let fileDatabase = [];
 
 // Função para carregar arquivos existentes
-function loadExistingFiles() {
+function loadExistingFiles(dir = uploadsDir, relativeDir = '') {
   try {
-    if (fs.existsSync(uploadsDir)) {
-      const files = fs.readdirSync(uploadsDir);
-      files.forEach(filename => {
-        const filePath = path.join(uploadsDir, filename);
-        const stats = fs.statSync(filePath);
-        const exists = fileDatabase.find(f => f.filename === filename);
-        if (!exists) {
-          fileDatabase.push({
-            id: crypto.randomUUID(),
-            filename: filename,
-            originalName: filename,
-            size: stats.size,
-            uploadDate: stats.birthtime || stats.ctime,
-            type: path.extname(filename).toLowerCase()
-          });
+    if (fs.existsSync(dir)) {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries.forEach(entry => {
+        const fullPath = path.join(dir, entry.name);
+        const relPath = path.join(relativeDir, entry.name);
+        const stats = fs.statSync(fullPath);
+        if (entry.isDirectory()) {
+          loadExistingFiles(fullPath, relPath);
+        } else {
+          const exists = fileDatabase.find(f => f.path === relPath);
+          if (!exists) {
+            fileDatabase.push({
+              id: crypto.randomUUID(),
+              filename: entry.name,
+              path: relPath,
+              directory: relativeDir,
+              originalName: entry.name,
+              size: stats.size,
+              uploadDate: stats.birthtime || stats.ctime,
+              type: path.extname(entry.name).toLowerCase()
+            });
+          }
         }
       });
     }
@@ -106,10 +129,14 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
+     const dir = (req.body.dir || '').replace(/\\/g, '/');
+
     const uploadedFiles = req.files.map(file => {
       const fileInfo = {
         id: crypto.randomUUID(),
         filename: file.filename,
+         directory: dir,
+        path: path.join(dir, file.filename),
         originalName: file.originalname,
         size: file.size,
         uploadDate: new Date(),
@@ -133,7 +160,11 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
 app.get('/files', (req, res) => {
   try {
     const query = (req.query.search || '').toLowerCase();
+    const dir = (req.query.dir || '').replace(/\\/g, '/');
     let files = fileDatabase;
+    if (dir) {
+      files = files.filter(f => f.directory === dir);
+    }
     if (query) {
       files = files.filter(f => f.originalName.toLowerCase().includes(query));
     }
@@ -162,11 +193,12 @@ app.patch('/rename/:id', (req, res) => {
     const currentExt = path.extname(fileInfo.filename);
     const unique = path.basename(fileInfo.filename, currentExt).split('-').pop();
     const newFileName = `${base}-${unique}${ext || currentExt}`;
-    const oldPath = path.join(uploadsDir, fileInfo.filename);
-    const newPath = path.join(uploadsDir, newFileName);
+    const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
+    const newPath = path.join(uploadsDir, fileInfo.directory || '', newFileName);
     fs.renameSync(oldPath, newPath);
 
     fileInfo.filename = newFileName;
+    fileInfo.path = path.join(fileInfo.directory || '', newFileName);
     fileInfo.originalName = newName;
     fileInfo.type = ext.toLowerCase() || currentExt.toLowerCase();
 
@@ -185,7 +217,7 @@ app.get('/download/:id', (req, res) => {
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
-    const filePath = path.join(uploadsDir, fileInfo.filename);
+    const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Arquivo físico não encontrado' });
     }
@@ -206,7 +238,7 @@ app.delete('/delete/:id', (req, res) => {
     }
 
     const fileInfo = fileDatabase[fileIndex];
-    const filePath = path.join(uploadsDir, fileInfo.filename);
+    const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
 
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -227,8 +259,11 @@ app.post('/directories', (req, res) => {
     if (!name) {
       return res.status(400).json({ error: 'Nome do diretório é obrigatório' });
     }
-    const safeName = path.basename(name);
-    const dirPath = path.join(uploadsDir, safeName);
+    const relative = path.normalize(name).replace(/^([\.\/])+/, '');
+    const dirPath = path.join(uploadsDir, relative);
+    if (!dirPath.startsWith(uploadsDir)) {
+      return res.status(400).json({ error: 'Diretório inválido' });
+    }
     if (fs.existsSync(dirPath)) {
       return res.status(400).json({ error: 'Diretório já existe' });
     }
@@ -243,17 +278,41 @@ app.post('/directories', (req, res) => {
 // Deletar diretório
 app.delete('/directories/:name', (req, res) => {
   try {
-    const safeName = path.basename(req.params.name);
-    const dirPath = path.join(uploadsDir, safeName);
+    const relative = path.normalize(req.params.name).replace(/^([\.\/])+/, '');
+    const dirPath = path.join(uploadsDir, relative);
+    if (!dirPath.startsWith(uploadsDir)) {
+      return res.status(400).json({ error: 'Diretório inválido' });
+    }
     if (!fs.existsSync(dirPath)) {
       return res.status(404).json({ error: 'Diretório não encontrado' });
     }
     fs.rmSync(dirPath, { recursive: true, force: true });
-    fileDatabase = fileDatabase.filter(f => !f.filename.startsWith(`${safeName}/`));
+    fileDatabase = fileDatabase.filter(f => !f.path.startsWith(`${relative}/`));
     res.json({ message: 'Diretório excluído com sucesso' });
   } catch (error) {
     console.error('Erro ao excluir diretório:', error);
     res.status(500).json({ error: 'Erro ao excluir diretório' });
+  }
+});
+
+// Listar diretórios
+app.get('/directories', (req, res) => {
+  try {
+    const dir = (req.query.dir || '').replace(/\\/g, '/');
+    const dirPath = path.join(uploadsDir, dir);
+    if (!dirPath.startsWith(uploadsDir)) {
+      return res.status(400).json({ error: 'Diretório inválido' });
+    }
+    if (!fs.existsSync(dirPath)) {
+      return res.status(404).json({ error: 'Diretório não encontrado' });
+    }
+    const dirs = fs.readdirSync(dirPath, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+    res.json(dirs);
+  } catch (error) {
+    console.error('Erro ao listar diretórios:', error);
+    res.status(500).json({ error: 'Erro ao listar diretórios' });
   }
 });
 
