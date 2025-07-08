@@ -54,6 +54,7 @@ let currentDir = '';
       for (let file of files) {
         formData.append('files', file);
       }
+      formData.append('dir', currentDir);
 
       uploadFiles(formData);
     }
