@@ -153,18 +153,21 @@ let currentDir = '';
           <a href="/download/${file.id}" class="btn btn-download" download>
             ⬇️ Baixar
           </a>
-          <button class="btn btn-download" onclick="renameFile('${file.id}')">
+         <button class="btn btn-download rename-btn" data-id="${file.id}">
             ✏️ Renomear
           </button>
-          <button class="btn btn-move" onclick="moveFile('${file.id}')">
+          <button class="btn btn-move move-btn" data-id="${file.id}">
             📂 Mover
           </button>
-          <button class="btn btn-delete" onclick="deleteFile('${file.id}')">
+          <button class="btn btn-delete delete-btn" data-id="${file.id}">
             🗑️ Excluir
           </button>
         </div>
       `;
-
+      card.querySelector('.rename-btn').addEventListener('click', () => renameFile(file.id));
+      card.querySelector('.move-btn').addEventListener('click', () => moveFile(file.id));
+      card.querySelector('.delete-btn').addEventListener('click', () => deleteFile(file.id));
+        
       return card;
     }
 
