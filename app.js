@@ -31,6 +31,42 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Arquivo para armazenar diretórios protegidos
+const protectedFile = path.join(__dirname, 'protected-dirs.json');
+let protectedDirs = {};
+if (fs.existsSync(protectedFile)) {
+  try {
+    protectedDirs = JSON.parse(fs.readFileSync(protectedFile));
+  } catch (err) {
+    protectedDirs = {};
+  }
+}
+
+function saveProtectedDirs() {
+  fs.writeFileSync(protectedFile, JSON.stringify(protectedDirs, null, 2));
+}
+
+function getProtectedEntry(dir) {
+  const parts = dir.split('/');
+  while (parts.length > 0) {
+    const p = parts.join('/');
+    if (protectedDirs[p]) {
+      return protectedDirs[p];
+    }
+    parts.pop();
+  }
+  return null;
+}
+
+function verifyAccess(dir, req) {
+  const hash = getProtectedEntry(dir);
+  if (!hash) return true;
+  const provided = req.headers['x-dir-password'] || req.query.password || req.body.password;
+  if (!provided) return false;
+  const providedHash = crypto.createHash('sha256').update(provided).digest('hex');
+  return providedHash === hash;
+}
+
 // Configuração do multer para upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -133,6 +169,9 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
     }
 
      const dir = (req.body.dir || '').replace(/\\/g, '/');
+    if (dir && !verifyAccess(dir, req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }
 
     const uploadedFiles = req.files.map(file => {
       const fileInfo = {
@@ -166,6 +205,10 @@ app.get('/files', (req, res) => {
     const dir = (req.query.dir || '').replace(/\\/g, '/');
     let files = fileDatabase;
     
+    if (dir && !verifyAccess(dir, req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }
+    
     if (dir) {
       files = files.filter(f => f.directory === dir);
       } else {
@@ -196,6 +239,9 @@ app.patch('/rename/:id', (req, res) => {
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
+if (!verifyAccess(fileInfo.directory || '', req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }    
     const ext = path.extname(newName);
     const base = path.basename(newName, ext);
     const currentExt = path.extname(fileInfo.filename);
@@ -230,6 +276,9 @@ app.patch('/move/:id', (req, res) => {
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
+     if (!verifyAccess(fileInfo.directory || '', req) || (newDir && !verifyAccess(newDir, req))) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }
     const destDir = path.join(uploadsDir, newDir);
     if (!destDir.startsWith(uploadsDir)) {
       return res.status(400).json({ error: 'Diretório inválido' });
@@ -257,6 +306,9 @@ app.get('/download/:id', (req, res) => {
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
+    if (!verifyAccess(fileInfo.directory || '', req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }
     const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Arquivo físico não encontrado' });
@@ -278,6 +330,9 @@ app.delete('/delete/:id', (req, res) => {
     }
 
     const fileInfo = fileDatabase[fileIndex];
+    if (!verifyAccess(fileInfo.directory || '', req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }
     const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
 
     if (fs.existsSync(filePath)) {
@@ -295,7 +350,7 @@ app.delete('/delete/:id', (req, res) => {
 // Criar diretório
 app.post('/directories', (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, password } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Nome do diretório é obrigatório' });
     }
@@ -307,7 +362,16 @@ app.post('/directories', (req, res) => {
     if (fs.existsSync(dirPath)) {
       return res.status(400).json({ error: 'Diretório já existe' });
     }
+    const parent = relative.split('/').slice(0, -1).join('/');
+    if (parent && !verifyAccess(parent, req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }
     fs.mkdirSync(dirPath, { recursive: true });
+    if (password) {
+      const hash = crypto.createHash('sha256').update(password).digest('hex');
+      protectedDirs[relative] = hash;
+      saveProtectedDirs();
+    }
     res.json({ message: 'Diretório criado com sucesso' });
   } catch (error) {
     console.error('Erro ao criar diretório:', error);
@@ -326,8 +390,15 @@ app.delete('/directories/:name', (req, res) => {
     if (!fs.existsSync(dirPath)) {
       return res.status(404).json({ error: 'Diretório não encontrado' });
     }
+    if (!verifyAccess(relative, req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    }
     fs.rmSync(dirPath, { recursive: true, force: true });
     fileDatabase = fileDatabase.filter(f => !f.path.startsWith(`${relative}/`));
+    if (protectedDirs[relative]) {
+      delete protectedDirs[relative];
+      saveProtectedDirs();
+    }
     res.json({ message: 'Diretório excluído com sucesso' });
   } catch (error) {
     console.error('Erro ao excluir diretório:', error);
@@ -345,6 +416,9 @@ app.get('/directories', (req, res) => {
     }
     if (!fs.existsSync(dirPath)) {
       return res.status(404).json({ error: 'Diretório não encontrado' });
+    }
+    if (dir && !verifyAccess(dir, req)) {
+      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
     const dirs = fs.readdirSync(dirPath, { withFileTypes: true })
       .filter(d => d.isDirectory())
