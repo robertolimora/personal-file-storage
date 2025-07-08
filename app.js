@@ -165,12 +165,17 @@ app.get('/files', (req, res) => {
     const query = (req.query.search || '').toLowerCase();
     const dir = (req.query.dir || '').replace(/\\/g, '/');
     let files = fileDatabase;
+    
     if (dir) {
       files = files.filter(f => f.directory === dir);
+      } else {
+      files = files.filter(f => !f.directory);
     }
+    
     if (query) {
       files = files.filter(f => f.originalName.toLowerCase().includes(query));
     }
+    
     const sortedFiles = files.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
     res.json(sortedFiles);
   } catch (error) {
