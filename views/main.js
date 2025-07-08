@@ -258,10 +258,11 @@ function moveFile(fileId) {
       const name = prompt('Nome da nova pasta:');
       if (!name) return;
          const fullPath = currentDir ? `${currentDir}/${name}` : name;
+      const password = prompt('Senha para a pasta (deixe vazio para pública):') || '';
       fetch('/directories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ name: fullPath })
+       body: JSON.stringify({ name: fullPath, password })
       })
         .then(response => response.json())
         .then(data => {
@@ -275,8 +276,11 @@ function moveFile(fileId) {
       const name = prompt('Nome da pasta a excluir:');
       if (!name) return;
      const fullPath = currentDir ? `${currentDir}/${name}` : name;
+      const password = prompt('Senha da pasta (se houver):') || '';
       fetch(`/directories/${encodeURIComponent(fullPath)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
       })
         .then(response => response.json())
         .then(data => {
