@@ -33,3 +33,4 @@ Thumbs.db
 # Arquivos de build
 dist/
 build/
+protected-dirs.json
