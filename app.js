@@ -90,11 +90,17 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = crypto.randomBytes(8).toString('hex');
-    const ext = path.extname(file.originalname);
-    const name = path.basename(file.originalname, ext);
+    const original = decodeFilename(file.originalname);
+    const ext = path.extname(original);
+    const name = path.basename(original, ext);
     cb(null, `${name}-${uniqueSuffix}${ext}`);
   }
 });
+
+function decodeFilename(name) {
+  const converted = Buffer.from(name, 'latin1').toString('utf8');
+  return converted.includes('�') ? name : converted;
+}
 
 const upload = multer({
   storage: storage,
@@ -108,7 +114,7 @@ const upload = multer({
       '.pdf', '.doc', '.docx', '.txt',
       '.zip', '.rar', '.mp3', '.mp4', '.avi'
     ];
-    const extname = path.extname(file.originalname).toLowerCase();
+    const extname = path.extname(decodeFilename(file.originalname)).toLowerCase();
     if (allowedExt.includes(extname)) {
       return cb(null, true);
     }
@@ -174,15 +180,16 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
     }
 
     const uploadedFiles = req.files.map(file => {
+      const original = decodeFilename(file.originalname);
       const fileInfo = {
         id: crypto.randomUUID(),
         filename: file.filename,
-         directory: dir,
+        directory: dir,
         path: path.join(dir, file.filename),
-        originalName: file.originalname,
+        originalName: original,
         size: file.size,
         uploadDate: new Date(),
-        type: path.extname(file.originalname).toLowerCase()
+        type: path.extname(original).toLowerCase()
       };
       fileDatabase.push(fileInfo);
       return fileInfo;
