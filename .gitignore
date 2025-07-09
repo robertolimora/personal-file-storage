@@ -5,7 +5,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Arquivos de upload (não versionar arquivos pessoais)
-uploads/
+uploads/*
+!uploads/metadata.json
 *.log
 
 # Arquivos do sistema
