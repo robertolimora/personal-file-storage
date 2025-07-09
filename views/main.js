@@ -80,7 +80,7 @@ function handleFiles(files) {
   uploadFiles(formData);
 }
 
-function uploadFiles(formData) {
+function uploadFiles(formData, retry = false) {
   progressBar.style.display = 'block';
   messageDiv.innerHTML = '';
 
@@ -103,6 +103,14 @@ function uploadFiles(formData) {
       const response = JSON.parse(xhr.responseText);
       showMessage(response.message, 'success');
       loadFiles();
+      } else if (xhr.status === 403 && !retry) {
+      const pwd = prompt('Senha da pasta:');
+      if (pwd !== null) {
+        dirPasswords[currentDir] = pwd;
+        uploadFiles(formData, true);
+      } else {
+        showMessage('Senha incorreta ou acesso negado', 'error');
+      }
     } else {
       const error = JSON.parse(xhr.responseText);
       showMessage(error.error || 'Erro no upload', 'error');
@@ -116,6 +124,9 @@ function uploadFiles(formData) {
   });
 
   xhr.open('POST', '/upload');
+  if (dirPasswords[currentDir]) {
+    xhr.setRequestHeader('X-Dir-Password', dirPasswords[currentDir]);
+  }
   xhr.send(formData);
 }
 
