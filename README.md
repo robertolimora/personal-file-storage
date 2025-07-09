@@ -105,6 +105,9 @@ max: 10, // uploads por janela de tempo
 windowMs: 15 * 60 * 1000, // 15 minutos
 ```
 
+### Diretório de Uploads
+Por padrão, os arquivos enviados são armazenados na pasta `uploads` na raiz do projeto. Você pode definir outro local configurando a variável de ambiente `UPLOADS_DIR`.
+
 ## 🛡️ Segurança
 
 O serviço inclui várias medidas de segurança:
