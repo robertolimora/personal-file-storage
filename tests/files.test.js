@@ -10,6 +10,8 @@ fs.writeFileSync(path.join(uploadsDir, 'dummy-test.txt'), 'test');
 
 const app = require('../app');
 
+let uploadedFile; // store uploaded file info for download and delete tests
+
 afterAll(() => {
   fs.rmSync(uploadsDir, { recursive: true, force: true });
 });
@@ -42,5 +44,38 @@ describe('PATCH /move/:id', () => {
     expect(res.body.message).toBeDefined();
     const movedPath = path.join(uploadsDir, 'moved', file.filename);
     expect(fs.existsSync(movedPath)).toBe(true);
+  });
+});
+
+describe('POST /upload', () => {
+  it('should upload a file via multipart/form-data', async () => {
+    const res = await request(app)
+      .post('/upload')
+      .attach('files', Buffer.from('hello world'), 'upload.txt');
+
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body.files)).toBe(true);
+    uploadedFile = res.body.files[0];
+    const filePath = path.join(uploadsDir, uploadedFile.filename);
+    expect(fs.existsSync(filePath)).toBe(true);
+  });
+});
+
+describe('GET /download/:id', () => {
+  it('should download previously uploaded file', async () => {
+    const res = await request(app).get(`/download/${uploadedFile.id}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.header['content-disposition']).toContain('attachment');
+    expect(res.headers['content-type']).toBeDefined();
+  });
+});
+
+describe('DELETE /delete/:id', () => {
+  it('should remove uploaded file', async () => {
+    const res = await request(app).delete(`/delete/${uploadedFile.id}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.message).toBeDefined();
+    const filePath = path.join(uploadsDir, uploadedFile.filename);
+    expect(fs.existsSync(filePath)).toBe(false);
   });
 });
