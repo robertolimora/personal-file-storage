@@ -279,8 +279,8 @@ async function moveFile(fileId) {
     const data = await response.json();
     if (data.message) {
       showMessage(data.message, 'success');
-      loadDirectories();
-      loadFiles();
+      await loadDirectories();
+      await loadFiles();
     } else {
       showMessage(data.error, 'error');
     }
@@ -354,11 +354,11 @@ function displayDirectories(dirs) {
   directoriesContainer.appendChild(grid);
 }
 
-function changeDirectory(name) {
+async function changeDirectory(name) {
   currentDir = currentDir ? `${currentDir}/${name}` : name;
   updateBreadcrumb();
-  loadDirectories();
-  loadFiles();
+  await loadDirectories();
+  await loadFiles();
 }
 
 function updateBreadcrumb() {
@@ -371,11 +371,11 @@ function updateBreadcrumb() {
   });
   breadcrumb.innerHTML = html;
   document.querySelectorAll('.crumb').forEach(el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', async () => {
       currentDir = el.getAttribute('data-path');
       updateBreadcrumb();
-      loadDirectories();
-      loadFiles();
+      await loadDirectories();
+      await loadFiles();
     });
   });
 }
@@ -412,8 +412,8 @@ function updateStats() {
 }
 
 // Carregar arquivos quando a página carregar
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   updateBreadcrumb();
-  loadDirectories();
-  loadFiles();
+  await loadDirectories();
+  await loadFiles();
 });
