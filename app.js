@@ -111,9 +111,8 @@ const upload = multer({
     const extname = path.extname(file.originalname).toLowerCase();
     if (allowedExt.includes(extname)) {
       return cb(null, true);
-      return cb(null, true);
-    cb(new Error('Tipo de arquivo não permitido'));
     }
+    cb(new Error('Tipo de arquivo não permitido'));
   }
 });
 
