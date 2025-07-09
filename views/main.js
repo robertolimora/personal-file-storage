@@ -13,10 +13,24 @@ const statsDiv = document.getElementById('stats');
 let currentDir = '';
 const dirPasswords = {};
 
+function getDirPassword(dir) {
+  let d = dir;
+  while (true) {
+    if (dirPasswords[d]) {
+      return dirPasswords[d];
+    }
+    const idx = d.lastIndexOf('/');
+    if (idx === -1) break;
+    d = d.slice(0, idx);
+  }
+  return dirPasswords[''] || null;
+}
+
 async function fetchWithAuth(url, options = {}, dir = currentDir) {
   const opts = { ...options, headers: { ...(options.headers || {}) } };
-  if (dirPasswords[dir]) {
-    opts.headers['X-Dir-Password'] = dirPasswords[dir];
+  const pwd = getDirPassword(dir);
+  if (pwd) {
+    opts.headers['X-Dir-Password'] = pwd;
   }
   let res = await fetch(url, opts);
   if (res.status === 403 && !options._retry) {
@@ -186,7 +200,7 @@ function createFileCard(file) {
       <div>📦 ${size}</div>
     </div>
     <div class=\"file-actions\">
-      <a href=\"/download/${file.id}?password=${encodeURIComponent(dirPasswords[currentDir] || '')}\" class=\"btn btn-download\" download>
+      <a href=\"/download/${file.id}?password=${encodeURIComponent(getDirPassword(currentDir) || '')}\" class=\"btn btn-download\" download>
         ⬇️ Baixar
       </a>
      <button class=\"btn btn-download rename-btn\" data-id=\"${file.id}\">
