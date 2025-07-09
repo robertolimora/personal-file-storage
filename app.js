@@ -26,7 +26,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'views')));
 
 // Criar diretório de uploads se não existir
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(__dirname, 'uploads'));
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
