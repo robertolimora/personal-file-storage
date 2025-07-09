@@ -59,6 +59,18 @@ describe('POST /upload', () => {
     const filePath = path.join(uploadsDir, uploadedFile.filename);
     expect(fs.existsSync(filePath)).toBe(true);
   });
+  it('should preserve UTF-8 characters in filename', async () => {
+    const res = await request(app)
+      .post('/upload')
+      .attach('files', Buffer.from('hello'), 'vídeo.txt');
+
+    expect(res.statusCode).toBe(200);
+    const uploaded = res.body.files[0];
+    expect(uploaded.originalName).toBe('vídeo.txt');
+    const filePath = path.join(uploadsDir, uploaded.filename);
+    expect(fs.existsSync(filePath)).toBe(true);
+    await request(app).delete(`/delete/${uploaded.id}`);
+  });
 });
 
 describe('GET /download/:id', () => {
