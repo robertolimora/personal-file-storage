@@ -82,6 +82,23 @@ describe('GET /download/:id', () => {
   });
 });
 
+describe('Persistence across restart', () => {
+  it('should download file after server reload', async () => {
+    const uploadRes = await request(app)
+      .post('/upload')
+      .attach('files', Buffer.from('reboot'), 'reboot.txt');
+
+    const persisted = uploadRes.body.files[0];
+
+    jest.resetModules();
+    const newApp = require('../app');
+
+    const res = await request(newApp).get(`/download/${persisted.id}`);
+    expect(res.statusCode).toBe(200);
+    await request(newApp).delete(`/delete/${persisted.id}`);
+  });
+});
+
 describe('DELETE /delete/:id', () => {
   it('should remove uploaded file', async () => {
     const res = await request(app).delete(`/delete/${uploadedFile.id}`);
