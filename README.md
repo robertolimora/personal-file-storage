@@ -198,6 +198,10 @@ Para dúvidas ou problemas:
 
 ---
 
+## Licença
+
+Este projeto está licenciado sob os termos da licença MIT. Consulte o arquivo [LICENSE](LICENSE) para mais informações.
+
 **🎉 Agora você tem seu próprio serviço de arquivos na nuvem!**
 
 Acesse de qualquer lugar do mundo e tenha seus arquivos sempre disponíveis.
