@@ -32,7 +32,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Arquivo para armazenar diretórios protegidos
-const protectedFile = path.join(__dirname, 'protected-dirs.json');
+const protectedFile = path.join(uploadsDir, '.protected-dirs.json');
 let protectedDirs = {};
 if (fs.existsSync(protectedFile)) {
   try {
@@ -125,6 +125,7 @@ function loadExistingFiles(dir = uploadsDir, relativeDir = '') {
     if (fs.existsSync(dir)) {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       entries.forEach(entry => {
+        if (entry.name.startsWith('.')) return; // ignore hidden files/directories
         const fullPath = path.join(dir, entry.name);
         const relPath = path.join(relativeDir, entry.name);
         const stats = fs.statSync(fullPath);
