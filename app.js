@@ -7,8 +7,8 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 
-
 const app = express();
+app.set('trust proxy', true); // permite que Express confie no proxy do Render
 const PORT = process.env.PORT || 3000;
 
 // Middleware de segurança
