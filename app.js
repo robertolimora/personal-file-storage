@@ -31,6 +31,9 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Arquivo de metadados para persistência entre reinícios
+const metadataFile = path.join(uploadsDir, 'metadata.json');
+
 // Arquivo para armazenar diretórios protegidos
 const protectedFile = path.join(uploadsDir, '.protected-dirs.json');
 let protectedDirs = {};
@@ -44,6 +47,10 @@ if (fs.existsSync(protectedFile)) {
 
 function saveProtectedDirs() {
   fs.writeFileSync(protectedFile, JSON.stringify(protectedDirs, null, 2));
+}
+
+function saveMetadata() {
+  fs.writeFileSync(metadataFile, JSON.stringify(fileDatabase, null, 2));
 }
 
 function getProtectedEntry(dir) {
@@ -125,38 +132,57 @@ const upload = multer({
 // Armazenar metadados dos arquivos
 let fileDatabase = [];
 
-// Função para carregar arquivos existentes
+// Função para carregar arquivos existentes e metadados
 function loadExistingFiles(dir = uploadsDir, relativeDir = '') {
   try {
-    if (fs.existsSync(dir)) {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      entries.forEach(entry => {
-        if (entry.name.startsWith('.')) return; // ignore hidden files/directories
-        const fullPath = path.join(dir, entry.name);
-        const relPath = path.join(relativeDir, entry.name);
-        const stats = fs.statSync(fullPath);
-        if (entry.isDirectory()) {
-          loadExistingFiles(fullPath, relPath);
-        } else {
-          const exists = fileDatabase.find(f => f.path === relPath);
-          if (!exists) {
-            fileDatabase.push({
-              id: crypto.randomUUID(),
-              filename: entry.name,
-              path: relPath,
-              directory: relativeDir,
-              originalName: entry.name,
-              size: stats.size,
-              uploadDate: stats.birthtime || stats.ctime,
-              type: path.extname(entry.name).toLowerCase()
-            });
-          }
-        }
-      });
+    // Carregar metadados persistidos
+    if (fs.existsSync(metadataFile)) {
+      fileDatabase = JSON.parse(fs.readFileSync(metadataFile));
     }
-  } catch (error) {
-    console.error('Erro ao carregar arquivos existentes:', error);
+  } catch (err) {
+    console.error('Erro ao ler metadata:', err);
+    fileDatabase = [];
   }
+
+  const verified = [];
+  const existingPaths = new Set();
+  fileDatabase.forEach(entry => {
+    const filePath = path.join(uploadsDir, entry.path);
+    if (fs.existsSync(filePath)) {
+      verified.push(entry);
+      existingPaths.add(entry.path);
+    }
+  });
+  fileDatabase = verified;
+
+  function scan(currentDir, rel) {
+    if (!fs.existsSync(currentDir)) return;
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    entries.forEach(e => {
+      if (e.name.startsWith('.')) return;
+      const fullPath = path.join(currentDir, e.name);
+      const relPath = path.join(rel, e.name);
+      if (e.isDirectory()) {
+        scan(fullPath, relPath);
+      } else if (!existingPaths.has(relPath)) {
+        const stats = fs.statSync(fullPath);
+        fileDatabase.push({
+          id: crypto.randomUUID(),
+          filename: e.name,
+          path: relPath,
+          directory: rel,
+          originalName: e.name,
+          size: stats.size,
+          uploadDate: stats.birthtime || stats.ctime,
+          type: path.extname(e.name).toLowerCase()
+        });
+        existingPaths.add(relPath);
+      }
+    });
+  }
+  
+  scan(dir, relativeDir);
+  saveMetadata();
 }
 
 // Carregar arquivos existentes na inicialização
@@ -194,6 +220,8 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
       fileDatabase.push(fileInfo);
       return fileInfo;
     });
+
+    saveMetadata();
 
     res.json({
       message: 'Arquivos enviados com sucesso!',
@@ -256,14 +284,15 @@ if (!verifyAccess(fileInfo.directory || '', req)) {
     const newFileName = `${base}-${unique}${ext || currentExt}`;
     const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     const newPath = path.join(uploadsDir, fileInfo.directory || '', newFileName);
-    fs.renameSync(oldPath, newPath);
+  fs.renameSync(oldPath, newPath);
 
-    fileInfo.filename = newFileName;
-    fileInfo.path = path.join(fileInfo.directory || '', newFileName);
-    fileInfo.originalName = newName;
-    fileInfo.type = ext.toLowerCase() || currentExt.toLowerCase();
+  fileInfo.filename = newFileName;
+  fileInfo.path = path.join(fileInfo.directory || '', newFileName);
+  fileInfo.originalName = newName;
+  fileInfo.type = ext.toLowerCase() || currentExt.toLowerCase();
+  saveMetadata();
 
-    res.json({ message: 'Arquivo renomeado com sucesso' });
+  res.json({ message: 'Arquivo renomeado com sucesso' });
   } catch (error) {
     console.error('Erro ao renomear arquivo:', error);
     res.status(500).json({ error: 'Erro ao renomear arquivo' });
@@ -286,7 +315,7 @@ app.patch('/move/:id', (req, res) => {
      if (!verifyAccess(fileInfo.directory || '', req) || (newDir && !verifyAccess(newDir, req))) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
-    const destDir = path.join(uploadsDir, newDir);
+  const destDir = path.join(uploadsDir, newDir);
     if (!destDir.startsWith(uploadsDir)) {
       return res.status(400).json({ error: 'Diretório inválido' });
     }
@@ -295,10 +324,10 @@ app.patch('/move/:id', (req, res) => {
     }
     const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     const newPath = path.join(destDir, fileInfo.filename);
-    fs.renameSync(oldPath, newPath);
-    fileInfo.directory = newDir;
-    fileInfo.path = path.join(newDir, fileInfo.filename);
-    res.json({ message: 'Arquivo movido com sucesso' });
+  fs.renameSync(oldPath, newPath);
+  fileInfo.directory = newDir;
+  fileInfo.path = path.join(newDir, fileInfo.filename);
+  res.json({ message: 'Arquivo movido com sucesso' });
   } catch (error) {
     console.error('Erro ao mover arquivo:', error);
     res.status(500).json({ error: 'Erro ao mover arquivo' });
@@ -342,12 +371,13 @@ app.delete('/delete/:id', (req, res) => {
     }
     const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
 
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
 
-    fileDatabase.splice(fileIndex, 1);
-    res.json({ message: 'Arquivo deletado com sucesso' });
+  fileDatabase.splice(fileIndex, 1);
+  saveMetadata();
+  res.json({ message: 'Arquivo deletado com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar arquivo:', error);
     res.status(500).json({ error: 'Erro ao deletar arquivo' });
