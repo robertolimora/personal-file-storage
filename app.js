@@ -31,8 +31,8 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-34  // Arquivo de metadados para persistência entre reinícios
-35  const metadataFile = path.join(uploadsDir, 'metadata.json');
+// Arquivo de metadados para persistência entre reinícios
+const metadataFile = path.join(uploadsDir, 'metadata.json');
 
 // Arquivo para armazenar diretórios protegidos
 const protectedFile = path.join(uploadsDir, '.protected-dirs.json');
