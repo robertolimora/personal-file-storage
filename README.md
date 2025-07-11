@@ -118,6 +118,36 @@ O serviço inclui várias medidas de segurança:
 - **Nomes Únicos**: Evita conflitos de arquivos
 - **Sanitização**: Nomes de arquivo seguros
 
+## 🗄️ Persistência de Metadados com PostgreSQL
+
+Caso prefira armazenar as informações dos uploads em um banco de dados ao
+invés do arquivo `metadata.json`, o Render permite provisionar um PostgreSQL
+gratuito.
+
+1. **Criar o banco**
+   - No dashboard do Render clique em *New +* → *PostgreSQL*.
+   - Escolha um nome e finalize (o plano Free já atende testes).
+
+2. **Obter a string de conexão**
+   - Abra o banco recém-criado e copie o valor de **Internal Database URL**.
+
+3. **Definir variável no serviço**
+   - Na página do seu Web Service adicione a variável `DATABASE_URL`
+     contendo a URL copiada.
+
+4. **Instalar a dependência**
+   ```bash
+   npm install pg
+   ```
+   (verifique se `pg` está em `dependencies`)
+
+5. **Atualizar o código**
+   - Utilize `process.env.DATABASE_URL` para conectar no banco e substituir
+     as operações de leitura/escrita de `metadata.json` por comandos SQL.
+
+Também é possível declarar o banco no `render.yaml` usando um bloco
+`databases` e vinculando `DATABASE_URL` com `fromDatabase`.
+
 ## 📱 Uso
 
 ### Upload de Arquivos
