@@ -15,3 +15,8 @@ services:
       mountPath: /opt/render/project/src/uploads
       sizeGB: 1
       
+SetEnv DB_HOST dpg-d1p4baer433s73cvjjl0-a
+SetEnv DB_PORT 5432
+SetEnv DB_DATABASE db_personal_files
+SetEnv DB_USERNAME db_personal_files_user
+SetEnv DB_PASSWORD yO9MyKY5rRG9SyGMuNf5u2NoZapgYkg0
