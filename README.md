@@ -168,7 +168,8 @@ Também é possível declarar o banco no `render.yaml` usando um bloco
 
 ### Download de Arquivos
 - Clique no botão "Baixar" em qualquer arquivo
-- O download iniciará automaticamente
+- Se a pasta estiver protegida, a senha será solicitada
+- O arquivo é baixado diretamente pelo navegador
 
 ### Excluir Arquivos
 - Clique no botão "Excluir" (confirmação será solicitada)
