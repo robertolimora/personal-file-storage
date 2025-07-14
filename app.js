@@ -3,6 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const fsp = fs.promises;
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
@@ -283,7 +284,7 @@ app.patch('/rename/:id', async (req, res) => {
     const newFileName = `${base}-${unique}${ext || currentExt}`;
     const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     const newPath = path.join(uploadsDir, fileInfo.directory || '', newFileName);
-    fs.renameSync(oldPath, newPath);
+    await fsp.rename(oldPath, newPath);
 
     await pool.query(
       'UPDATE files SET filename=$1, path=$2, originalname=$3, type=$4 WHERE id=$5',
@@ -325,11 +326,11 @@ app.patch('/move/:id', async (req, res) => {
       return res.status(400).json({ error: 'Diretório inválido' });
     }
     if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true });
+      await fsp.mkdir(destDir, { recursive: true });
     }
     const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     const newPath = path.join(destDir, fileInfo.filename);
-    fs.renameSync(oldPath, newPath);
+    await fsp.rename(oldPath, newPath);
     await pool.query('UPDATE files SET directory=$1, path=$2 WHERE id=$3', [
       newDir || null,
       path.join(newDir, fileInfo.filename),
@@ -381,7 +382,11 @@ app.delete('/delete/:id', async (req, res) => {
     const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
 
     if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+    try {
+        await fsp.unlink(filePath);
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+      }
     }
 
     await pool.query('DELETE FROM files WHERE id=$1', [fileId]);
@@ -393,7 +398,7 @@ app.delete('/delete/:id', async (req, res) => {
 });
 
 // Criar diretório
-app.post('/directories', (req, res) => {
+app.post('/directories', async (req, res) => {
   try {
     const { name, password } = req.body;
     if (!name) {
@@ -411,7 +416,7 @@ app.post('/directories', (req, res) => {
     if (parent && !verifyAccess(parent, req)) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
-    fs.mkdirSync(dirPath, { recursive: true });
+    await fsp.mkdir(dirPath, { recursive: true });
     if (password) {
       const hash = crypto.createHash('sha256').update(password).digest('hex');
       protectedDirs[relative] = hash;
@@ -451,7 +456,7 @@ app.delete('/directories/:name', async (req, res) => {
 });
 
 // Listar diretórios
-app.get('/directories', (req, res) => {
+app.get('/directories', async (req, res) => {
   try {
     const dir = (req.query.dir || '').replace(/\\/g, '/');
     const dirPath = path.join(uploadsDir, dir);
@@ -464,9 +469,8 @@ app.get('/directories', (req, res) => {
     if (dir && !verifyAccess(dir, req)) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
-    const dirs = fs.readdirSync(dirPath, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
+    const entries = await fsp.readdir(dirPath, { withFileTypes: true });
+    const dirs = entries.filter(d => d.isDirectory()).map(d => d.name);
     res.json(dirs);
   } catch (error) {
     console.error('Erro ao listar diretórios:', error);
