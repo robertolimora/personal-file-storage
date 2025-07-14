@@ -109,6 +109,18 @@ windowMs: 15 * 60 * 1000, // 15 minutos
 ### Diretório de Uploads
 Por padrão, os arquivos enviados são armazenados na pasta `uploads` na raiz do projeto. Você pode definir outro local configurando a variável de ambiente `UPLOADS_DIR`.
 
+### Arquivo `.env`
+Crie um arquivo chamado `.env` na raiz do projeto com as variáveis abaixo:
+
+```bash
+PORT=3000                # Porta do servidor Express
+UPLOADS_DIR=./uploads    # Diretório para os arquivos enviados
+# Opcional: string de conexão do PostgreSQL
+DATABASE_URL=postgres://usuario:senha@host:5432/banco
+```
+
+Se `DATABASE_URL` não for definido, o serviço mantém os metadados em `uploads/metadata.json` e funciona apenas com o sistema de arquivos.
+
 ## 🛡️ Segurança
 
 O serviço inclui várias medidas de segurança:
