@@ -11,6 +11,7 @@ Um serviço completo de armazenamento de arquivos pessoais na nuvem, com interfa
 - **Interface Responsiva**: Funciona perfeitamente em desktop e mobile
 - **Segurança**: Rate limiting e validação de tipos de arquivo
 - **Estatísticas**: Visualize quantos arquivos e espaço você está usando
+- **PostgreSQL**: Metadados armazenados no banco via `pg`
 
 ## 🚀 Deploy no Render.com
 
