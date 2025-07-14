@@ -1,6 +1,12 @@
 const request = require('supertest');
 const fs = require('fs');
 const path = require('path');
+const { newDb } = require('pg-mem');
+global.__TEST_DB__ = global.__TEST_DB__ || newDb();
+jest.mock('pg', () => {
+  return global.__TEST_DB__.adapters.createPg();
+});
+process.env.DATABASE_URL = 'postgres://localhost/test';
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -9,6 +15,10 @@ if (!fs.existsSync(uploadsDir)) {
 fs.writeFileSync(path.join(uploadsDir, 'dummy-test.txt'), 'test');
 
 const app = require('../app');
+
+beforeAll(async () => {
+  await app.ready;
+});
 
 let uploadedFile; // store uploaded file info for download and delete tests
 
@@ -90,10 +100,11 @@ describe('Persistence across restart', () => {
 
     const persisted = uploadRes.body.files[0];
 
-    jest.resetModules();
-    const newApp = require('../app');
+  jest.resetModules();
+  const newApp = require('../app');
+  await newApp.ready;
 
-    const res = await request(newApp).get(`/download/${persisted.id}`);
+  const res = await request(newApp).get(`/download/${persisted.id}`);
     expect(res.statusCode).toBe(200);
     await request(newApp).delete(`/delete/${persisted.id}`);
   });
