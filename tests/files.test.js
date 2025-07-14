@@ -1,6 +1,7 @@
 const request = require('supertest');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { newDb } = require('pg-mem');
 global.__TEST_DB__ = global.__TEST_DB__ || newDb();
 jest.mock('pg', () => {
@@ -8,10 +9,8 @@ jest.mock('pg', () => {
 });
 process.env.DATABASE_URL = 'postgres://localhost/test';
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
-}
+const uploadsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'uploads-'));
+process.env.UPLOADS_DIR = uploadsDir;
 fs.writeFileSync(path.join(uploadsDir, 'dummy-test.txt'), 'test');
 
 const app = require('../app');
