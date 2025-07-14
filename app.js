@@ -439,7 +439,6 @@ app.delete('/directories/:name', async (req, res) => {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
     await pool.query('DELETE FROM files WHERE path LIKE $1', [`${relative}/%`]);
-    fileDatabase = fileDatabase.filter(f => !f.path.startsWith(`${relative}/`));
     if (protectedDirs[relative]) {
       delete protectedDirs[relative];
       saveProtectedDirs();
