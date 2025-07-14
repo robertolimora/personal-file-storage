@@ -200,8 +200,7 @@ function createFileCard(file) {
       <div>📦 ${size}</div>
     </div>
     <div class=\"file-actions\">
-      <a href=\"/download/${file.id}?password=${encodeURIComponent(getDirPassword(currentDir) || '')}\" class=\"btn btn-download\" download>
-        ⬇️ Baixar
+      <a href="#" class=\"btn btn-download download-btn\">
       </a>
      <button class=\"btn btn-download rename-btn\" data-id=\"${file.id}\">
         ✏️ Renomear
@@ -214,6 +213,10 @@ function createFileCard(file) {
       </button>
     </div>
   `;
+  card.querySelector('.download-btn').addEventListener('click', (e) => {
+    e.preventDefault();
+    downloadFile(file);
+  });
   card.querySelector('.rename-btn').addEventListener('click', () => renameFile(file.id));
   card.querySelector('.move-btn').addEventListener('click', () => moveFile(file.id));
   card.querySelector('.delete-btn').addEventListener('click', () => deleteFile(file.id));
@@ -300,6 +303,28 @@ async function moveFile(fileId) {
     }
   } catch {
     showMessage('Erro ao mover arquivo', 'error');
+  }
+}
+
+async function downloadFile(file) {
+  try {
+    const response = await fetchWithAuth(`/download/${file.id}`);
+    if (response.status === 200) {
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.originalName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } else {
+      const data = await response.json();
+      showMessage(data.error || 'Erro no download', 'error');
+    }
+  } catch {
+    showMessage('Erro no download', 'error');
   }
 }
 
