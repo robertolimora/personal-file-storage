@@ -115,11 +115,11 @@ Crie um arquivo chamado `.env` na raiz do projeto com as variáveis abaixo:
 ```bash
 PORT=3000                # Porta do servidor Express
 UPLOADS_DIR=./uploads    # Diretório para os arquivos enviados
-# Opcional: string de conexão do PostgreSQL
-DATABASE_URL=postgres://usuario:senha@host:5432/banco
+# String de conexão do PostgreSQL (obrigatório)
+DATABASE_URL=postgresql://db_personal_files_user:yO9MyKY5rRG9SyGMuNf5u2NoZapgYkg0@dpg-d1p4baer433s73cvjjl0-a:5432/db_personal_files
 ```
 
-Se `DATABASE_URL` não for definido, o serviço mantém os metadados em `uploads/metadata.json` e funciona apenas com o sistema de arquivos.
+O serviço armazena todos os metadados no PostgreSQL, portanto a variável `DATABASE_URL` deve estar configurada.
 
 ## 🛡️ Segurança
 
@@ -133,9 +133,7 @@ O serviço inclui várias medidas de segurança:
 
 ## 🗄️ Persistência de Metadados com PostgreSQL
 
-Caso prefira armazenar as informações dos uploads em um banco de dados ao
-invés do arquivo `metadata.json`, o Render permite provisionar um PostgreSQL
-gratuito.
+Os metadados dos uploads são salvos em uma tabela PostgreSQL. Para utilizar o serviço em produção, crie um banco no Render e defina a variável `DATABASE_URL`.
 
 1. **Criar o banco**
    - No dashboard do Render clique em *New +* → *PostgreSQL*.
@@ -154,9 +152,8 @@ gratuito.
    ```
    (verifique se `pg` está em `dependencies`)
 
-5. **Atualizar o código**
-   - Utilize `process.env.DATABASE_URL` para conectar no banco e substituir
-     as operações de leitura/escrita de `metadata.json` por comandos SQL.
+**Código**
+   - Este repositório já usa `process.env.DATABASE_URL` para persistir os dados.
 
 Também é possível declarar o banco no `render.yaml` usando um bloco
 `databases` e vinculando `DATABASE_URL` com `fromDatabase`.
