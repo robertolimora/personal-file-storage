@@ -6,6 +6,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const { Pool } = require('pg');
 const app = express();
 
 // Confiar apenas no primeiro proxy (p.ex. Render)
@@ -26,14 +27,13 @@ const uploadLimit = rateLimit({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'views')));
 
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
 // Criar diretório de uploads se não existir
 const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(__dirname, 'uploads'));
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-
-// Arquivo de metadados para persistência entre reinícios
-const metadataFile = path.join(uploadsDir, 'metadata.json');
 
 // Arquivo para armazenar diretórios protegidos
 const protectedFile = path.join(uploadsDir, '.protected-dirs.json');
@@ -48,10 +48,6 @@ if (fs.existsSync(protectedFile)) {
 
 function saveProtectedDirs() {
   fs.writeFileSync(protectedFile, JSON.stringify(protectedDirs, null, 2));
-}
-
-function saveMetadata() {
-  fs.writeFileSync(metadataFile, JSON.stringify(fileDatabase, null, 2));
 }
 
 function getProtectedEntry(dir) {
@@ -130,64 +126,44 @@ const upload = multer({
   }
 });
 
-// Armazenar metadados dos arquivos
-let fileDatabase = [];
-
 // Função para carregar arquivos existentes e metadados
-function loadExistingFiles(dir = uploadsDir, relativeDir = '') {
-  try {
-    // Carregar metadados persistidos
-    if (fs.existsSync(metadataFile)) {
-      fileDatabase = JSON.parse(fs.readFileSync(metadataFile));
-    }
-  } catch (err) {
-    console.error('Erro ao ler metadata:', err);
-    fileDatabase = [];
-  }
+async function loadExistingFiles(dir = uploadsDir, relativeDir = '') {
+  await pool.query('CREATE TABLE IF NOT EXISTS files (id TEXT, filename TEXT, directory TEXT, path TEXT, originalName TEXT, size INTEGER, uploadDate TEXT, type TEXT)');
 
-  const verified = [];
-  const existingPaths = new Set();
-  fileDatabase.forEach(entry => {
-    const filePath = path.join(uploadsDir, entry.path);
-    if (fs.existsSync(filePath)) {
-      verified.push(entry);
-      existingPaths.add(entry.path);
-    }
-  });
-  fileDatabase = verified;
+  const { rows } = await pool.query('SELECT path FROM files');
+  const existingPaths = new Set(rows.map(r => r.path));
 
-  function scan(currentDir, rel) {
+  async function scan(currentDir, rel) {
     if (!fs.existsSync(currentDir)) return;
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    entries.forEach(e => {
-      if (e.name.startsWith('.')) return;
+   for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
       const fullPath = path.join(currentDir, e.name);
       const relPath = path.join(rel, e.name);
       if (e.isDirectory()) {
-        scan(fullPath, relPath);
+        await scan(fullPath, relPath);
       } else if (!existingPaths.has(relPath)) {
         const stats = fs.statSync(fullPath);
-        fileDatabase.push({
-          id: crypto.randomUUID(),
-          filename: e.name,
-          path: relPath,
-          directory: rel,
-          originalName: e.name,
-          size: stats.size,
-          uploadDate: stats.birthtime || stats.ctime,
-          type: path.extname(e.name).toLowerCase()
-        });
+        await pool.query(
+          'INSERT INTO files(id, filename, directory, path, originalName, size, uploadDate, type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+          [
+            crypto.randomUUID(),
+            e.name,
+            rel || null,
+            relPath,
+            e.name,
+            stats.size,
+            new Date().toISOString(),
+            path.extname(e.name).toLowerCase()
+          ]
+        );
         existingPaths.add(relPath);
       }
-    });
+    }
   }
   
-  scan(dir, relativeDir);
-  saveMetadata();
+  await scan(dir, relativeDir);
 }
-
-// Carregar arquivos existentes na inicialização
-loadExistingFiles();
 
 // Rotas
 app.get('/', (req, res) => {
@@ -195,7 +171,7 @@ app.get('/', (req, res) => {
 });
 
 // Upload de arquivos
-app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
+app.post('/upload', uploadLimit, upload.array('files', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
@@ -206,23 +182,34 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
 
-    const uploadedFiles = req.files.map(file => {
+    const uploadedFiles = [];
+    for (const file of req.files) {
       const original = decodeFilename(file.originalname);
-      const fileInfo = {
-        id: crypto.randomUUID(),
+      const id = crypto.randomUUID();
+      await pool.query(
+        'INSERT INTO files(id, filename, directory, path, originalName, size, uploadDate, type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [
+          id,
+          file.filename,
+          dir || null,
+          path.join(dir, file.filename),
+          original,
+          file.size,
+          new Date().toISOString(),
+          path.extname(original).toLowerCase()
+        ]
+      );
+      uploadedFiles.push({
+        id,
         filename: file.filename,
         directory: dir,
         path: path.join(dir, file.filename),
         originalName: original,
         size: file.size,
-        uploadDate: new Date(),
+        uploadDate: new Date().toISOString(),
         type: path.extname(original).toLowerCase()
-      };
-      fileDatabase.push(fileInfo);
-      return fileInfo;
-    });
-
-    saveMetadata();
+      });
+    }
 
     res.json({
       message: 'Arquivos enviados com sucesso!',
@@ -235,28 +222,38 @@ app.post('/upload', uploadLimit, upload.array('files', 5), (req, res) => {
 });
 
 // Listar arquivos com opcao de busca
-app.get('/files', (req, res) => {
+app.get('/files', async (req, res) => {
   try {
     const query = (req.query.search || '').toLowerCase();
     const dir = (req.query.dir || '').replace(/\\/g, '/');
-    let files = fileDatabase;
-    
+        
     if (dir && !verifyAccess(dir, req)) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
-    
+
+    let result;
     if (dir) {
-      files = files.filter(f => f.directory === dir);
-      } else {
-      files = files.filter(f => !f.directory);
+     result = await pool.query('SELECT * FROM files WHERE directory = $1', [dir]);
+    } else {
+      result = await pool.query("SELECT * FROM files WHERE directory IS NULL OR directory = ''");
     }
-    
+
+    let files = result.rows;
     if (query) {
-      files = files.filter(f => f.originalName.toLowerCase().includes(query));
+      files = files.filter(f => f.originalname.toLowerCase().includes(query));
     }
-    
-    const sortedFiles = files.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-    res.json(sortedFiles);
+    files.sort((a, b) => new Date(b.uploaddate) - new Date(a.uploaddate));
+    files = files.map(f => ({
+      id: f.id,
+      filename: f.filename,
+      directory: f.directory,
+      path: f.path,
+      originalName: f.originalname,
+      size: f.size,
+      uploadDate: f.uploaddate,
+      type: f.type
+    }));
+    res.json(files);
   } catch (error) {
     console.error('Erro ao listar arquivos:', error);
     res.status(500).json({ error: 'Erro ao listar arquivos' });
@@ -264,18 +261,19 @@ app.get('/files', (req, res) => {
 });
 
 // Renomear arquivo
-app.patch('/rename/:id', (req, res) => {
+app.patch('/rename/:id', async (req, res) => {
   try {
     const fileId = req.params.id;
     const { newName } = req.body;
     if (!newName) {
       return res.status(400).json({ error: 'Novo nome obrigatório' });
     }
-    const fileInfo = fileDatabase.find(f => f.id === fileId);
+    const result = await pool.query('SELECT * FROM files WHERE id=$1', [fileId]);
+    const fileInfo = result.rows[0];
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
-if (!verifyAccess(fileInfo.directory || '', req)) {
+    if (!verifyAccess(fileInfo.directory || '', req)) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }    
     const ext = path.extname(newName);
@@ -285,13 +283,18 @@ if (!verifyAccess(fileInfo.directory || '', req)) {
     const newFileName = `${base}-${unique}${ext || currentExt}`;
     const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     const newPath = path.join(uploadsDir, fileInfo.directory || '', newFileName);
-  fs.renameSync(oldPath, newPath);
+    fs.renameSync(oldPath, newPath);
 
-  fileInfo.filename = newFileName;
-  fileInfo.path = path.join(fileInfo.directory || '', newFileName);
-  fileInfo.originalName = newName;
-  fileInfo.type = ext.toLowerCase() || currentExt.toLowerCase();
-  saveMetadata();
+    await pool.query(
+      'UPDATE files SET filename=$1, path=$2, originalname=$3, type=$4 WHERE id=$5',
+      [
+        newFileName,
+        path.join(fileInfo.directory || '', newFileName),
+        newName,
+        ext.toLowerCase() || currentExt.toLowerCase(),
+        fileId
+      ]
+    );
 
   res.json({ message: 'Arquivo renomeado com sucesso' });
   } catch (error) {
@@ -301,7 +304,7 @@ if (!verifyAccess(fileInfo.directory || '', req)) {
 });
 
 // Mover arquivo para outra pasta
-app.patch('/move/:id', (req, res) => {
+app.patch('/move/:id', async (req, res) => {
   try {
     const fileId = req.params.id;
     let { newDir } = req.body;
@@ -309,14 +312,15 @@ app.patch('/move/:id', (req, res) => {
       return res.status(400).json({ error: 'Diretório alvo é obrigatório' });
     }
     newDir = path.normalize(newDir).replace(/^([\.\/])+/, '');
-    const fileInfo = fileDatabase.find(f => f.id === fileId);
+    const result = await pool.query('SELECT * FROM files WHERE id=$1', [fileId]);
+    const fileInfo = result.rows[0];
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
      if (!verifyAccess(fileInfo.directory || '', req) || (newDir && !verifyAccess(newDir, req))) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
-  const destDir = path.join(uploadsDir, newDir);
+    const destDir = path.join(uploadsDir, newDir);
     if (!destDir.startsWith(uploadsDir)) {
       return res.status(400).json({ error: 'Diretório inválido' });
     }
@@ -325,10 +329,13 @@ app.patch('/move/:id', (req, res) => {
     }
     const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
     const newPath = path.join(destDir, fileInfo.filename);
-  fs.renameSync(oldPath, newPath);
-  fileInfo.directory = newDir;
-  fileInfo.path = path.join(newDir, fileInfo.filename);
-  res.json({ message: 'Arquivo movido com sucesso' });
+    fs.renameSync(oldPath, newPath);
+    await pool.query('UPDATE files SET directory=$1, path=$2 WHERE id=$3', [
+      newDir || null,
+      path.join(newDir, fileInfo.filename),
+      fileId
+    ]);
+    res.json({ message: 'Arquivo movido com sucesso' });
   } catch (error) {
     console.error('Erro ao mover arquivo:', error);
     res.status(500).json({ error: 'Erro ao mover arquivo' });
@@ -336,10 +343,11 @@ app.patch('/move/:id', (req, res) => {
 });
 
 // Download de arquivo
-app.get('/download/:id', (req, res) => {
+app.get('/download/:id', async (req, res) => {
   try {
     const fileId = req.params.id;
-    const fileInfo = fileDatabase.find(f => f.id === fileId);
+    const result = await pool.query('SELECT * FROM files WHERE id=$1', [fileId]);
+    const fileInfo = result.rows[0];
     if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
@@ -350,7 +358,7 @@ app.get('/download/:id', (req, res) => {
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Arquivo físico não encontrado' });
     }
-    res.download(filePath, fileInfo.originalName);
+    res.download(filePath, fileInfo.originalname);
   } catch (error) {
     console.error('Erro no download:', error);
     res.status(500).json({ error: 'Erro no download' });
@@ -358,27 +366,26 @@ app.get('/download/:id', (req, res) => {
 });
 
 // Deletar arquivo
-app.delete('/delete/:id', (req, res) => {
+app.delete('/delete/:id', async (req, res) => {
   try {
     const fileId = req.params.id;
-    const fileIndex = fileDatabase.findIndex(f => f.id === fileId);
-    if (fileIndex === -1) {
+    const result = await pool.query('SELECT * FROM files WHERE id=$1', [fileId]);
+    const fileInfo = result.rows[0];
+    if (!fileInfo) {
       return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
 
-    const fileInfo = fileDatabase[fileIndex];
     if (!verifyAccess(fileInfo.directory || '', req)) {
-      return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
+    return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
     const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
 
-  if (fs.existsSync(filePath)) {
+    if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
-  }
+    }
 
-  fileDatabase.splice(fileIndex, 1);
-  saveMetadata();
-  res.json({ message: 'Arquivo deletado com sucesso' });
+    await pool.query('DELETE FROM files WHERE id=$1', [fileId]);
+    res.json({ message: 'Arquivo deletado com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar arquivo:', error);
     res.status(500).json({ error: 'Erro ao deletar arquivo' });
@@ -418,7 +425,7 @@ app.post('/directories', (req, res) => {
 });
 
 // Deletar diretório
-app.delete('/directories/:name', (req, res) => {
+app.delete('/directories/:name', async (req, res) => {
   try {
     const relative = path.normalize(req.params.name).replace(/^([\.\/])+/, '');
     const dirPath = path.join(uploadsDir, relative);
@@ -431,7 +438,7 @@ app.delete('/directories/:name', (req, res) => {
     if (!verifyAccess(relative, req)) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
-    fs.rmSync(dirPath, { recursive: true, force: true });
+    await pool.query('DELETE FROM files WHERE path LIKE $1', [`${relative}/%`]);
     fileDatabase = fileDatabase.filter(f => !f.path.startsWith(`${relative}/`));
     if (protectedDirs[relative]) {
       delete protectedDirs[relative];
@@ -470,14 +477,15 @@ app.get('/directories', (req, res) => {
 
 
 // Informações do sistema
-app.get('/stats', (req, res) => {
+app.get('/stats', async (req, res) => {
   try {
-    const totalFiles = fileDatabase.length;
-    const totalSize = fileDatabase.reduce((sum, file) => sum + file.size, 0);
+    const result = await pool.query('SELECT COUNT(*) AS count, COALESCE(SUM(size),0) AS size FROM files');
+    const totalFiles = Number(result.rows[0].count);
+    const totalSize = Number(result.rows[0].size);
     res.json({
       totalFiles,
       totalSize: formatBytes(totalSize),
-      diskSpace: getDiskSpace()
+      diskSpace: await getDiskSpace()
     });
   } catch (error) {
     console.error('Erro ao obter estatísticas:', error);
@@ -496,14 +504,16 @@ function formatBytes(bytes, decimals = 2) {
 }
 
 // Função para obter espaço em disco
-function getDiskSpace() {
+async function getDiskSpace() {
   try {
+    const result = await pool.query('SELECT COALESCE(SUM(size),0) AS size FROM files');
+    const used = Number(result.rows[0].size);
     return {
-      used: formatBytes(fileDatabase.reduce((sum, file) => sum + file.size, 0)),
-      available: "Unlimited (Render.com)"
+      used: formatBytes(used),
+      available: 'Unlimited (Render.com)'
     };
   } catch (error) {
-    return { used: "0 Bytes", available: "Unknown" };
+    return { used: '0 Bytes', available: 'Unknown' };
   }
 }
 
@@ -525,12 +535,18 @@ app.use((error, req, res, next) => {
 });
 
 // Iniciar servidor apenas se este arquivo for executado diretamente
+const ready = loadExistingFiles();
+
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-    console.log(`📁 Diretório de uploads: ${uploadsDir}`);
-    console.log(`📊 ${fileDatabase.length} arquivos carregados`);
+  ready.then(async () => {
+    const result = await pool.query('SELECT COUNT(*) AS count FROM files');
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor rodando na porta ${PORT}`);
+      console.log(`📁 Diretório de uploads: ${uploadsDir}`);
+      console.log(`📊 ${result.rows[0].count} arquivos carregados`);
+    });
   });
 }
 
 module.exports = app;
+module.exports.ready = ready;
