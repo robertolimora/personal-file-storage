@@ -201,6 +201,7 @@ function createFileCard(file) {
     </div>
     <div class=\"file-actions\">
       <a href="#" class=\"btn btn-download download-btn\">
+        📥 Baixar
       </a>
      <button class=\"btn btn-download rename-btn\" data-id=\"${file.id}\">
         ✏️ Renomear
