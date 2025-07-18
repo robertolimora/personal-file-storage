@@ -183,6 +183,10 @@ Também é possível declarar o banco no `render.yaml` usando um bloco
 - Utilize o botão "Mover" para escolher outra pasta
 - O arquivo será transferido para o diretório informado
 
+### Excluir Pastas
+- Diretórios podem ser removidos pela API ou interface
+- Toda a pasta e os arquivos internos são apagados do disco
+
 ## 🔄 Atualizações
 
 Para atualizar o serviço:
