@@ -32,17 +32,22 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Criar diretório de uploads se não existir
 const uploadsDir = path.resolve(process.env.UPLOADS_DIR || path.join(__dirname, 'uploads'));
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 // Arquivo para armazenar diretórios protegidos
 const protectedFile = path.join(uploadsDir, '.protected-dirs.json');
 let protectedDirs = {};
-if (fs.existsSync(protectedFile)) {
+
+async function initialize() {
   try {
-    protectedDirs = JSON.parse(fs.readFileSync(protectedFile));
-  } catch (err) {
+    await fsp.access(uploadsDir);
+  } catch {
+    await fsp.mkdir(uploadsDir, { recursive: true });
+  }
+
+  try {
+    const data = await fsp.readFile(protectedFile, 'utf8');
+    protectedDirs = JSON.parse(data);
+  } catch {
     protectedDirs = {};
   }
 }
@@ -74,7 +79,7 @@ function verifyAccess(dir, req) {
 
 // Configuração do multer para upload
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: async (req, file, cb) => {
     try {
       let targetDir = uploadsDir;
       const dir = (req.body.dir || '').replace(/\\/g, '/');
@@ -83,8 +88,10 @@ const storage = multer.diskStorage({
         if (!safePath.startsWith(uploadsDir)) {
           return cb(new Error('Diretório inválido'));
         }
-        if (!fs.existsSync(safePath)) {
-          fs.mkdirSync(safePath, { recursive: true });
+        try {
+          await fsp.access(safePath);
+        } catch {
+          await fsp.mkdir(safePath, { recursive: true });
         }
         targetDir = safePath;
       }
@@ -135,16 +142,20 @@ async function loadExistingFiles(dir = uploadsDir, relativeDir = '') {
   const existingPaths = new Set(rows.map(r => r.path));
 
   async function scan(currentDir, rel) {
-    if (!fs.existsSync(currentDir)) return;
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-   for (const e of entries) {
+    try {
+      await fsp.access(currentDir);
+    } catch {
+      return;
+    }
+    const entries = await fsp.readdir(currentDir, { withFileTypes: true });
+    for (const e of entries) {
       if (e.name.startsWith('.')) continue;
       const fullPath = path.join(currentDir, e.name);
       const relPath = path.join(rel, e.name);
       if (e.isDirectory()) {
         await scan(fullPath, relPath);
       } else if (!existingPaths.has(relPath)) {
-        const stats = fs.statSync(fullPath);
+        const stats = await fsp.stat(fullPath);
         await pool.query(
           'INSERT INTO files(id, filename, directory, path, originalName, size, uploadDate, type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
           [
@@ -325,7 +336,9 @@ app.patch('/move/:id', async (req, res) => {
     if (!destDir.startsWith(uploadsDir)) {
       return res.status(400).json({ error: 'Diretório inválido' });
     }
-    if (!fs.existsSync(destDir)) {
+    try {
+      await fsp.access(destDir);
+    } catch {
       await fsp.mkdir(destDir, { recursive: true });
     }
     const oldPath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
@@ -356,7 +369,9 @@ app.get('/download/:id', async (req, res) => {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
     const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
-    if (!fs.existsSync(filePath)) {
+    try {
+      await fsp.access(filePath);
+    } catch {
       return res.status(404).json({ error: 'Arquivo físico não encontrado' });
     }
     res.download(filePath, fileInfo.originalname);
@@ -381,12 +396,10 @@ app.delete('/delete/:id', async (req, res) => {
     }
     const filePath = path.join(uploadsDir, fileInfo.directory || '', fileInfo.filename);
 
-    if (fs.existsSync(filePath)) {
     try {
         await fsp.unlink(filePath);
-      } catch (err) {
-        if (err.code !== 'ENOENT') throw err;
-      }
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
     }
 
     await pool.query('DELETE FROM files WHERE id=$1', [fileId]);
@@ -408,9 +421,13 @@ app.post('/directories', async (req, res) => {
     const dirPath = path.join(uploadsDir, relative);
     if (!dirPath.startsWith(uploadsDir)) {
       return res.status(400).json({ error: 'Diretório inválido' });
+      
     }
-    if (fs.existsSync(dirPath)) {
+    try {
+      await fsp.access(dirPath);
       return res.status(400).json({ error: 'Diretório já existe' });
+      } catch {
+      // continua se não existir
     }
     const parent = relative.split('/').slice(0, -1).join('/');
     if (parent && !verifyAccess(parent, req)) {
@@ -437,7 +454,9 @@ app.delete('/directories/:name', async (req, res) => {
     if (!dirPath.startsWith(uploadsDir)) {
       return res.status(400).json({ error: 'Diretório inválido' });
     }
-    if (!fs.existsSync(dirPath)) {
+    try {
+      await fsp.access(dirPath);
+    } catch {
       return res.status(404).json({ error: 'Diretório não encontrado' });
     }
     if (!verifyAccess(relative, req)) {
@@ -464,7 +483,9 @@ app.get('/directories', async (req, res) => {
     if (!dirPath.startsWith(uploadsDir)) {
       return res.status(400).json({ error: 'Diretório inválido' });
     }
-    if (!fs.existsSync(dirPath)) {
+    try {
+      await fsp.access(dirPath);
+    } catch {
       return res.status(404).json({ error: 'Diretório não encontrado' });
     }
     if (dir && !verifyAccess(dir, req)) {
@@ -539,7 +560,10 @@ app.use((error, req, res, next) => {
 });
 
 // Iniciar servidor apenas se este arquivo for executado diretamente
-const ready = loadExistingFiles();
+const ready = (async () => {
+  await initialize();
+  await loadExistingFiles();
+})();
 
 if (require.main === module) {
   ready.then(async () => {
