@@ -113,13 +113,17 @@ Por padrão, os arquivos enviados são armazenados na pasta `uploads` na raiz do
 Crie um arquivo chamado `.env` na raiz do projeto com as variáveis abaixo:
 
 ```bash
-PORT=3000                # Porta do servidor Express
-UPLOADS_DIR=./uploads    # Diretório para os arquivos enviados
-# String de conexão do PostgreSQL (obrigatório)
-DATABASE_URL=postgresql://db_personal_files_user:yO9MyKY5rRG9SyGMuNf5u2NoZapgYkg0@dpg-d1p4baer433s73cvjjl0-a:5432/db_personal_files
+PORT=3000                    # Porta do servidor Express
+UPLOADS_DIR=./uploads        # Diretório para os arquivos enviados
+DATABASE_URL=postgresql://usuario:senha@host:5432/banco # Conexão PostgreSQL
+FTP_HOST=ftp.exemplo.com     # Dados do servidor FTP (opcional)
+FTP_USERNAME=usuario
+FTP_PASSWORD=senha
+FTP_API_KEY=sua-chave
 ```
 
-O serviço armazena todos os metadados no PostgreSQL, portanto a variável `DATABASE_URL` deve estar configurada.
+O serviço armazena todos os metadados no PostgreSQL, portanto a variável `DATABASE_URL` deve estar configurada. As variáveis `FTP_*` são utilizadas para o workflow de deploy via FTP e podem ser omitidas se não forem necessárias.
+
 
 ## 🛡️ Segurança
 
