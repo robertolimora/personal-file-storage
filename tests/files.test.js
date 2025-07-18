@@ -118,3 +118,22 @@ describe('DELETE /delete/:id', () => {
     expect(fs.existsSync(filePath)).toBe(false);
   });
 });
+
+describe('DELETE /directories/:name', () => {
+  it('should remove directory and its contents', async () => {
+    const dir = 'tempdir';
+    await request(app).post('/directories').send({ name: dir });
+    const uploadRes = await request(app)
+      .post('/upload')
+      .field('dir', dir)
+      .attach('files', Buffer.from('content'), 'inside.txt');
+    const uploaded = uploadRes.body.files[0];
+    const dirPath = path.join(uploadsDir, dir);
+    const filePath = path.join(dirPath, uploaded.filename);
+    expect(fs.existsSync(filePath)).toBe(true);
+
+    const res = await request(app).delete(`/directories/${dir}`);
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(dirPath)).toBe(false);
+  });
+});
