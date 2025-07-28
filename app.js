@@ -9,15 +9,31 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { Pool } = require('pg');
 const ftp = require('basic-ftp'); // adicionado para FTP
+const path = require('path');
 
-// dentro do upload loop, antes de uploadToFtp
-const localPath = path.join(uploadsDir, dir || '', file.filename);
-const remoteDir = dir ? dir.replace(/\\/g, '/') : '.';
-const remoteFile = file.filename;
-
-await client.access({ ... }); // já feito na função uploadToFtp
-await client.ensureDir(remoteDir); // cria a pasta se não existir
-await client.uploadFrom(localPath, `${remoteDir}/${remoteFile}`);
+async function uploadToFtp(localPath, remotePath) {
+  const client = new ftp.Client();
+  try {
+    await client.access({
+      host: process.env.FTP_HOST,
+      port: process.env.FTP_PORT ? Number(process.env.FTP_PORT) : 21,
+      user: process.env.FTP_USERNAME,
+      password: process.env.FTP_PASSWORD,
+      secure: false
+    });
+    // cria diretório no FTP se necessário
+    const remoteDir = path.posix.dirname(remotePath);
+    if (remoteDir && remoteDir !== '.') {
+      await client.ensureDir(remoteDir);
+    }
+    await client.uploadFrom(localPath, remotePath);
+    console.log(`Arquivo ${localPath} enviado para ${remotePath} no FTP`);
+  } catch (err) {
+    console.error('Erro ao enviar arquivo para o FTP:', err);
+  } finally {
+    client.close();
+  }
+}
 
 const app = express();
 
