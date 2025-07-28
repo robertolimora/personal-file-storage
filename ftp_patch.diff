@@ -1,0 +1,84 @@
+*** Begin Patch
+*** Update File: app.js
+@@
+ const { Pool } = require('pg');
+const ftp = require('basic-ftp');
+
+/**
+ * Upload a file to a remote FTP server using credentials from environment variables.
+ * @param {string} localPath - Absolute path to the file on disk.
+ * @param {string} remotePath - Destination path on the FTP server.
+ */
+async function uploadToFtp(localPath, remotePath) {
+  const client = new ftp.Client();
+  try {
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USERNAME,
+      password: process.env.FTP_PASSWORD,
+      secure: false
+    });
+    await client.uploadFrom(localPath, remotePath);
+    console.log(`Arquivo ${localPath} enviado para ${remotePath} no FTP`);
+  } catch (err) {
+    console.error('Erro ao enviar arquivo para o FTP:', err);
+  } finally {
+    client.close();
+  }
+}
+
+*** Begin Patch
+*** Update File: package.json
+@@
+   "dependencies": {
+     "dotenv": "^16.3.2",
+     "express": "^4.18.2",
+     "express-rate-limit": "^6.7.0",
+     "helmet": "^7.0.0",
+     "multer": "^2.0.2",
+-    "pg": "^8.16.3"
++    "pg": "^8.16.3",
++    "basic-ftp": "^5.0.2"
+   },
+*** End Patch
+*** End Patch
+@@ app.post('/upload', uploadLimit, upload.array('files', 5), async (req, res) => {
+@@
+     for (const file of req.files) {
+       const original = decodeFilename(file.originalname);
+       const id = crypto.randomUUID();
+       await pool.query(
+         'INSERT INTO files(id, filename, directory, path, originalName, size, uploadDate, type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+         [
+           id,
+           file.filename,
+           dir || null,
+           path.join(dir, file.filename),
+           original,
+           file.size,
+           new Date().toISOString(),
+           path.extname(original).toLowerCase()
+         ]
+       );
+       uploadedFiles.push({
+         id,
+         filename: file.filename,
+         directory: dir,
+         path: path.join(dir, file.filename),
+         originalName: original,
+         size: file.size,
+         uploadDate: new Date().toISOString(),
+         type: path.extname(original).toLowerCase()
+       });
+
+      // Enviar o arquivo para o servidor FTP após o upload local.
+      // Construímos o caminho local absoluto e o caminho remoto relativo.
+      try {
+        const localPath = path.join(uploadsDir, dir || '', file.filename);
+        const remotePath = path.join(dir || '', file.filename).replace(/\\/g, '/');
+        await uploadToFtp(localPath, remotePath);
+      } catch (err) {
+        // Não interrompe o fluxo se o FTP falhar; apenas registra o erro.
+        console.error('Erro no upload para o FTP:', err);
+      }
+     }
