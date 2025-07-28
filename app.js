@@ -10,6 +10,15 @@ const helmet = require('helmet');
 const { Pool } = require('pg');
 const ftp = require('basic-ftp'); // adicionado para FTP
 
+// dentro do upload loop, antes de uploadToFtp
+const localPath = path.join(uploadsDir, dir || '', file.filename);
+const remoteDir = dir ? dir.replace(/\\/g, '/') : '.';
+const remoteFile = file.filename;
+
+await client.access({ ... }); // já feito na função uploadToFtp
+await client.ensureDir(remoteDir); // cria a pasta se não existir
+await client.uploadFrom(localPath, `${remoteDir}/${remoteFile}`);
+
 const app = express();
 
 // Confiar apenas no primeiro proxy (p.ex. Render)
