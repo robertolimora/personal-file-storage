@@ -8,6 +8,8 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const { Pool } = require('pg');
+const ftp = require('basic-ftp'); // adicionado para FTP
+
 const app = express();
 
 // Confiar apenas no primeiro proxy (p.ex. Render)
@@ -134,6 +136,25 @@ const upload = multer({
   }
 });
 
+// Função utilitária de upload para o FTP
+async function uploadToFtp(localPath, remotePath) {
+  const client = new ftp.Client();
+  try {
+    await client.access({
+      host: process.env.FTP_HOST,
+      user: process.env.FTP_USERNAME,
+      password: process.env.FTP_PASSWORD,
+      secure: false
+    });
+    await client.uploadFrom(localPath, remotePath);
+    console.log(`Arquivo ${localPath} enviado para ${remotePath} no FTP`);
+  } catch (err) {
+    console.error('Erro ao enviar arquivo para o FTP:', err);
+  } finally {
+    client.close();
+  }
+}
+
 // Função para carregar arquivos existentes e metadados
 async function loadExistingFiles(dir = uploadsDir, relativeDir = '') {
   await pool.query('CREATE TABLE IF NOT EXISTS files (id TEXT, filename TEXT, directory TEXT, path TEXT, originalName TEXT, size INTEGER, uploadDate TEXT, type TEXT)');
@@ -189,7 +210,7 @@ app.post('/upload', uploadLimit, upload.array('files', 5), async (req, res) => {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-     const dir = (req.body.dir || '').replace(/\\/g, '/');
+    const dir = (req.body.dir || '').replace(/\\/g, '/');
     if (dir && !verifyAccess(dir, req)) {
       return res.status(403).json({ error: 'Senha incorreta ou acesso negado' });
     }
@@ -221,6 +242,15 @@ app.post('/upload', uploadLimit, upload.array('files', 5), async (req, res) => {
         uploadDate: new Date().toISOString(),
         type: path.extname(original).toLowerCase()
       });
+
+      // Envia o arquivo para o FTP após salvá-lo localmente
+      try {
+        const localPath = path.join(uploadsDir, dir || '', file.filename);
+        const remotePath = path.join(dir || '', file.filename).replace(/\\/g, '/');
+        await uploadToFtp(localPath, remotePath);
+      } catch (err) {
+        console.error('Erro no upload para o FTP:', err);
+      }
     }
 
     res.json({
@@ -499,7 +529,6 @@ app.get('/directories', async (req, res) => {
     res.status(500).json({ error: 'Erro ao listar diretórios' });
   }
 });
-
 
 // Informações do sistema
 app.get('/stats', async (req, res) => {
